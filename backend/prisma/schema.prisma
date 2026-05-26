@@ -7,138 +7,200 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
+enum Perfil {
+  ADMIN
+  GERENTE
   PO
   DEV
   TESTER
-  MANAGER
 }
 
-enum SprintStatus {
-  PLANNED
-  ACTIVE
-  COMPLETED
+enum StatusCard {
+  A_FAZER
+  EM_ANDAMENTO
+  HOMOLOGACAO
+  CONCLUIDO
 }
 
-enum TaskStatus {
-  TODO
-  IN_PROGRESS
-  TESTING
-  DONE
+enum Prioridade {
+  ALTA
+  MEDIA
+  BAIXA
 }
 
-enum LogActionType {
-  CREATED
-  MOVED_STATUS
-  ESTIMATED
-  DELETED
-  RESTORED
-  SPRINT_CHANGED
-  POKER_CONSOLIDATED
+enum StatusSprint {
+  PLANEJAMENTO
+  ATIVA
+  CONCLUIDA
 }
 
-model User {
-  id            String          @id @default(uuid())
-  name          String
-  email         String          @unique
-  password      String
-  memberships   ProjectMember[]
-  createdTasks  Task[]          @relation("CreatedTasks")
-  assignedTasks Task[]          @relation("AssignedTasks")
-  votes         Vote[]
-  logs          ActivityLog[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+enum TipoAnexo {
+  ARQUIVO
+  LINK_EXTERNO
 }
 
-model Project {
-  id          String          @id @default(uuid())
-  name        String
-  description String?
-  ownerId     String
-  members     ProjectMember[]
-  sprints     Sprint[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+enum TipoAcao {
+  MOVIMENTACAO
+  COMENTARIO
+  ALERTA
+  CRIACAO
 }
 
-model ProjectMember {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  role      Role     @default(DEV)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Usuario {
+  id_usuario    String           @id @default(uuid()) @db.Uuid
+  nome          String
+  email         String           @unique
+  senha_hash    String
+  membros       MembroProjeto[]
+  cards         Card[]           @relation("ResponsavelCards")
+  votos         VotoPoker[]
+  notificacoes  Notificacao[]    @relation("DestinoNotificacoes")
+  logs          LogAcoes[]
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  @@unique([userId, projectId])
+  @@map("usuarios")
+}
+
+model Projeto {
+  id_projeto    String           @id @default(uuid()) @db.Uuid
+  nome          String
+  descricao     String?
+  data_prazo    DateTime?
+  membros       MembroProjeto[]
+  sprints       Sprint[]
+  cards         Card[]
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@map("projetos")
+}
+
+model MembroProjeto {
+  id_membro     String           @id @default(uuid()) @db.Uuid
+  id_projeto    String           @db.Uuid
+  id_usuario    String           @db.Uuid
+  perfil        Perfil           @default(DEV)
+  
+  projeto       Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
+  usuario       Usuario          @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([id_projeto, id_usuario])
+  @@map("membros_projeto")
 }
 
 model Sprint {
-  id        String       @id @default(uuid())
-  name      String
-  startDate DateTime?
-  endDate   DateTime?
-  status    SprintStatus @default(PLANNED)
-  projectId String
-  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tasks     Task[]
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id_sprint     String           @id @default(uuid()) @db.Uuid
+  id_projeto    String           @db.Uuid
+  nome          String
+  data_inicio   DateTime?
+  data_fim      DateTime?
+  status        StatusSprint     @default(PLANEJAMENTO)
+  
+  projeto       Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
+  cards         Card[]
+  logs          LogAcoes[]
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@map("sprints")
 }
 
-model Task {
-  id           String        @id @default(uuid())
-  title        String
-  description  String?
-  status       TaskStatus    @default(TODO)
-  storyPoints  Int?
-  order        Int           @default(0)
-  sprintId     String?
-  sprint       Sprint?       @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  createdById  String
-  createdBy    User          @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Restrict)
-  assignedToId String?
-  assignedTo   User?         @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
-  votes        Vote[]
-  pokerState   PokerState?
-  logs         ActivityLog[]
-  deletedAt    DateTime?     // Soft Delete timestamp
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+model Card {
+  id_card        String           @id @default(uuid()) @db.Uuid
+  id_projeto     String           @db.Uuid
+  id_sprint      String?          @db.Uuid
+  id_responsavel String?          @db.Uuid
+  titulo         String
+  descricao      String?          @db.Text
+  prioridade     Prioridade       @default(MEDIA)
+  status         StatusCard       @default(A_FAZER)
+  story_points   Int?
+  em_risco       Boolean          @default(false)
+  deletado_em    DateTime?        @db.Timestamp
+  
+  projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
+  sprint         Sprint?          @relation(fields: [id_sprint], references: [id_sprint], onDelete: SetNull)
+  responsavel    Usuario?         @relation("ResponsavelCards", fields: [id_responsavel], references: [id_usuario], onDelete: SetNull)
+  
+  anexos         AnexoCard[]
+  votos          VotoPoker[]
+  notificacoes   Notificacao[]
+  logs           LogAcoes[]
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("cards")
 }
 
-model Vote {
-  id        String   @id @default(uuid())
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  value     String   // "1", "2", "3", "5", "8", "13", "?", "☕"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model AnexoCard {
+  id_anexo      String           @id @default(uuid()) @db.Uuid
+  id_card       String           @db.Uuid
+  nome_arquivo  String
+  url_arquivo   String
+  tipo_anexo    TipoAnexo
+  
+  card          Card             @relation(fields: [id_card], references: [id_card], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  @@unique([taskId, userId])
+  @@map("anexos_card")
 }
 
-model PokerState {
-  id                 String   @id @default(uuid())
-  taskId             String   @unique
-  task               Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  isRevealed         Boolean  @default(false)
-  consolidatedPoints Int?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+model VotoPoker {
+  id_voto       String           @id @default(uuid()) @db.Uuid
+  id_card       String           @db.Uuid
+  id_usuario    String           @db.Uuid
+  valor         Int
+  
+  card          Card             @relation(fields: [id_card], references: [id_card], onDelete: Cascade)
+  usuario       Usuario          @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([id_card, id_usuario])
+  @@map("votos_poker")
 }
 
-model ActivityLog {
-  id         String        @id @default(uuid())
-  taskId     String?
-  task       Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  userId     String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  actionType LogActionType
-  details    String?       // JSON metadata
-  createdAt  DateTime      @default(now())
+model Notificacao {
+  id_notificacao     String      @id @default(uuid()) @db.Uuid
+  id_usuario_destino String      @db.Uuid
+  id_card_origem     String      @db.Uuid
+  mensagem           String
+  lida               Boolean     @default(false)
+  
+  destino            Usuario     @relation("DestinoNotificacoes", fields: [id_usuario_destino], references: [id_usuario], onDelete: Cascade)
+  card               Card        @relation(fields: [id_card_origem], references: [id_card], onDelete: Cascade)
+  
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@map("notificacoes")
+}
+
+model LogAcoes {
+  id_log       String            @id @default(uuid()) @db.Uuid
+  id_usuario   String            @db.Uuid
+  id_card      String?           @db.Uuid
+  id_sprint    String?           @db.Uuid
+  acao         String
+  tipo_acao    TipoAcao
+  status_log   String
+  
+  usuario      Usuario           @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict)
+  card         Card?             @relation(fields: [id_card], references: [id_card], onDelete: SetNull)
+  sprint       Sprint?           @relation(fields: [id_sprint], references: [id_sprint], onDelete: SetNull)
+  
+  createdAt    DateTime          @default(now())
+
+  @@map("log_acoes")
 }
