@@ -6,7 +6,7 @@ services:
     container_name: quadrus-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: quadrus
     ports:
       - "5432:5432"
