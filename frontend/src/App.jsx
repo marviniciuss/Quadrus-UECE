@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import LoginExample from './components/LoginExample.jsx';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
@@ -203,6 +204,11 @@ export default function App() {
               Próximo passo: Criar controllers, roteadores e views.
             </div>
           </div>
+        </div>
+
+        {/* Firebase Authentication Boilerplate Form Module */}
+        <div className="mt-10 w-full">
+          <LoginExample />
         </div>
 
       </main>

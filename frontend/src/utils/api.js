@@ -1,16 +1,26 @@
 import axios from 'axios';
+import { auth } from './firebaseConfig.js';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
-  withCredentials: true, // Crucial for HttpOnly Cookie transport
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-// Request interceptor (e.g. for custom logging or injection)
+// Request interceptor: dynamically injects the active Firebase ID token
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        // Fetch JWT ID token. Automatically refreshes if expired.
+        const idToken = await currentUser.getIdToken();
+        config.headers.Authorization = `Bearer ${idToken}`;
+      } catch (error) {
+        console.error('Failed to attach Firebase Auth ID token:', error);
+      }
+    }
     return config;
   },
   (error) => {

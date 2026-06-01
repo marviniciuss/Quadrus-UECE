@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { verifyFirebaseToken } from './middlewares/auth.middleware.js';
 
 dotenv.config();
 
@@ -25,6 +26,14 @@ app.use(cookieParser());
 // Simple Healthcheck
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date() });
+});
+
+// Demo Protected Endpoint using Firebase Auth
+app.get('/api/protected', verifyFirebaseToken, (req, res) => {
+  res.json({
+    message: 'Acesso autorizado! Este é um endpoint altamente protegido.',
+    user: req.user
+  });
 });
 
 // Socket.io setup
