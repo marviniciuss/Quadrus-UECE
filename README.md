@@ -64,7 +64,7 @@ npm install
 
 #### Variáveis de Ambiente (.env)
 O arquivo `.env` na raiz do backend vem pré-configurado de fábrica para desenvolvimento. Caso queira customizar a conexão com o banco ou a chave secreta do JWT, edite as variáveis contidas nele:
-* `PORT`: Porta padrão do servidor backend (`5000`)
+* `PORT`: Porta padrão do servidor backend (`5001`)
 * `DATABASE_URL`: String de conexão com o banco Postgres (`postgresql://postgres:postgres@localhost:5432/quadrus?schema=public`)
 * `JWT_SECRET`: Chave secreta de geração de tokens de sessão
 * `CLIENT_URL`: URL de origem do frontend para liberação de CORS (`http://localhost:5173`)
@@ -131,7 +131,7 @@ Com tudo instalado, você pode executar o servidor backend e a aplicação front
 # No diretório /backend
 npm run dev
 ```
-*O servidor REST & WebSocket iniciará na porta `5000` (http://localhost:5000).*
+*O servidor REST & WebSocket iniciará na porta `5001` (http://localhost:5001).*
 
 ### Iniciar o Frontend
 ```bash

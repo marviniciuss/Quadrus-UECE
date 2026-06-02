@@ -32,7 +32,7 @@ export default function App() {
 
   // Check backend health & WebSocket connection on load
   useEffect(() => {
-    const BACKEND_URL = 'http://localhost:5000';
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
     
     // Express REST check
     axios.get(`${BACKEND_URL}/health`)
