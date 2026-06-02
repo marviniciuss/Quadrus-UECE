@@ -124,3 +124,7 @@ firebase-service-account.json
 *firebase-adminsdk*.json
 backend/firebase-service-account.json
 backend/*firebase-adminsdk*.json
+
+# Frontend env files
+frontend/.env
+frontend/.env.local
