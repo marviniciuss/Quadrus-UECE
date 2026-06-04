@@ -24,7 +24,7 @@ export default function LoginExample() {
       // Firebase authentication
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
       setUserProfile(user);
 
       // CAPTURING ID TOKEN (JWT) TO SEND TO BACKEND

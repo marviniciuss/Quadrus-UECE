@@ -6,11 +6,19 @@ import {
     Search,
     ArrowRight,
     Clock,
-    Briefcase
+    Briefcase,
+    X,
+    Calendar
 } from 'lucide-react';
 
-export default function ProjectList({ projects, onSelectProject }) {
+export default function ProjectList({ projects, onSelectProject, onCreateProject, userDisplayName }) {
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Estados para controlar o formulário do Novo Projeto
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [nome, setNome] = useState('');
+    const [descricao, setDescricao] = useState('');
+    const [prazo, setPrazo] = useState('');
 
     const getDaysRemaining = (dateString) => {
         const deadline = new Date(dateString);
@@ -25,8 +33,40 @@ export default function ProjectList({ projects, onSelectProject }) {
         project.descricao.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Envio do formulário de criação de projeto
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!nome || !descricao || !prazo) return;
+
+        // Estrutura o novo projeto conforme a modelagem
+        const newProject = {
+            id_projeto: String(projects.length + 1), // Gera um ID fictício incremental
+            nome: nome,
+            descricao: descricao,
+            data_prazo: new Date(prazo).toISOString(),
+            membros: [
+                {
+                    id_usuario: 'user-owner',
+                    nome: userDisplayName || 'Vinicius',
+                    perfil: 'GERENTE' // Criador padrão entra como GERENTE
+                }
+            ],
+            cards: [], // Inicia com 0 cartões
+            createdAt: new Date().toISOString()
+        };
+
+        // Salva o projeto e fecha o modal
+        onCreateProject(newProject);
+
+        // Reseta os campos do formulário
+        setNome('');
+        setDescricao('');
+        setPrazo('');
+        setIsModalOpen(false);
+    };
+
     return (
-        <div className="w-full max-w-4xl mx-auto px-4 py-6">
+        <div className="w-full max-w-4xl mx-auto px-4 py-6 relative">
 
             {/* Barra de Busca */}
             <div className="relative mb-6 text-left">
@@ -55,12 +95,10 @@ export default function ProjectList({ projects, onSelectProject }) {
                                 className="group relative flex flex-col bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-brand-500/40 transition-all duration-300 cursor-pointer text-left overflow-hidden"
                                 onClick={() => onSelectProject(project)}
                             >
-                                {/* Linha decorativa na lateral esquerda no hover */}
                                 <div className="absolute top-0 bottom-0 left-0 w-[4px] bg-gradient-to-b from-brand-600 to-indigo-500 transform scale-y-0 group-hover:scale-y-100 transition-transform duration-300 rounded-l-2xl" />
 
-                                {/* Bloco Superior: Ícone, Nome do Projeto (Lilás) e Descrição Completa */}
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 rounded-xl bg-brand-50 text-brand-600 shrink-0">
+                                    <div className="p-3 rounded-xl bg-brand-55 text-brand-600 shrink-0 bg-brand-50">
                                         <Briefcase size={22} />
                                     </div>
                                     <div className="flex-1">
@@ -73,24 +111,19 @@ export default function ProjectList({ projects, onSelectProject }) {
                                     </div>
                                 </div>
 
-                                {/* Bloco Inferior: Alinhado abaixo da descrição com os metadados */}
                                 <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
 
-                                    {/* Informações: Membros, Tarefas e Prazo */}
                                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                        {/* Badge Membros */}
                                         <span className="flex items-center gap-1 font-medium bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
                                             <Users size={14} className="text-slate-400" />
                                             {project.membros.length} membros
                                         </span>
 
-                                        {/* Badge Tarefas */}
                                         <span className="flex items-center gap-1 font-medium bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
                                             <CheckSquare size={14} className="text-slate-400" />
                                             {totalCards} tarefas
                                         </span>
 
-                                        {/* Badge Prazo */}
                                         <span className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 ${daysLeft < 20
                                             ? 'bg-rose-50 border-rose-100 text-rose-700'
                                             : 'bg-emerald-50 border-emerald-100 text-emerald-700'
@@ -100,10 +133,7 @@ export default function ProjectList({ projects, onSelectProject }) {
                                         </span>
                                     </div>
 
-                                    {/* Lado Direito: Barra de Progresso e Link de Abertura */}
                                     <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
-
-                                        {/* Barra de Progresso */}
                                         <div className="w-full md:w-36">
                                             <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mb-1">
                                                 <span>PROGRESSO</span>
@@ -117,14 +147,11 @@ export default function ProjectList({ projects, onSelectProject }) {
                                             </div>
                                         </div>
 
-                                        {/* Ação de Abrir */}
                                         <span className="text-brand-600 font-bold group-hover:translate-x-1 transition-transform flex items-center gap-1 text-sm shrink-0">
                                             Abrir <ArrowRight size={16} />
                                         </span>
                                     </div>
-
                                 </div>
-
                             </div>
                         );
                     })}
@@ -136,16 +163,113 @@ export default function ProjectList({ projects, onSelectProject }) {
                 </div>
             )}
 
-            {/* Botão Novo Projeto na parte inferior */}
+            {/* Botão Novo Projeto que agora abre o modal */}
             <div className="mt-12 flex justify-center">
                 <button
-                    onClick={() => alert("Função de criar projeto será conectada à API nas próximas etapas!")}
+                    onClick={() => setIsModalOpen(true)}
                     className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/20 active:scale-95 shadow-md shadow-brand-500/10"
                 >
                     <Plus size={18} />
                     Novo Projeto
                 </button>
             </div>
+
+            {/* ================= MODAL DE CRIAÇÃO DE PROJETO ================= */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+
+                    {/* Caixa do Modal */}
+                    <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden text-left p-6 md:p-8 animate-scale-up">
+
+                        {/* Header do Modal */}
+                        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                            <div>
+                                <h2 className="text-xl font-extrabold text-brand-600 flex items-center gap-2">
+                                    <Briefcase size={20} />
+                                    Criar Novo Projeto
+                                </h2>
+                                <p className="text-xs text-slate-400 mt-1">Insira os detalhes e prazos para o novo espaço ágil.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* Formulário */}
+                        <form onSubmit={handleSubmit} className="space-y-5">
+
+                            {/* Campo Nome */}
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    Nome do Projeto
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={nome}
+                                    onChange={(e) => setNome(e.target.value)}
+                                    placeholder="Ex: Quadrus - Kanban Colaborativo"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                                />
+                            </div>
+
+                            {/* Campo Descrição */}
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    Descrição do Escopo
+                                </label>
+                                <textarea
+                                    required
+                                    rows="3"
+                                    value={descricao}
+                                    onChange={(e) => setDescricao(e.target.value)}
+                                    placeholder="Descreva de forma simples o escopo deste projeto para a equipe..."
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 resize-none leading-relaxed"
+                                />
+                            </div>
+
+                            {/* Campo Prazo */}
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    Prazo de Entrega (Deadline)
+                                </label>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        type="date"
+                                        required
+                                        value={prazo}
+                                        onChange={(e) => setPrazo(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-slate-700"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Botões do Rodapé */}
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98]"
+                                >
+                                    Criar Projeto
+                                </button>
+                            </div>
+
+                        </form>
+
+                    </div>
+                </div>
+            )}
 
         </div>
     );

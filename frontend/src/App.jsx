@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Bell,
   HelpCircle,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './utils/firebaseConfig.js';
 import ProjectList from './components/ProjectList.jsx';
+import LoginScreen from './components/LoginScreen.jsx';
 
-// Centralizamos os dados mockados no arquivo principal (App.jsx)
 const MOCK_PROJECTS = [
   {
     id_projeto: '1',
@@ -65,15 +68,23 @@ const MOCK_PROJECTS = [
 ];
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false); // Mantemos desativado para testar offline
   const [backendStatus, setBackendStatus] = useState('checking');
   const [socketStatus, setSocketStatus] = useState('offline');
   const [selectedProject, setSelectedProject] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [projects] = useState(MOCK_PROJECTS);
+
+  // Agora a lista de projetos é um estado mutável
+  const [projects, setProjects] = useState(MOCK_PROJECTS);
 
   const dropdownRef = useRef(null);
 
-  // Fecha o dropdown se o usuário clicar fora dele
+  // Função para adicionar um novo projeto na lista
+  const handleCreateProject = (newProject) => {
+    setProjects([...projects, newProject]);
+  };
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -105,6 +116,26 @@ export default function App() {
     };
   }, []);
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setSelectedProject(null);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans">
+        <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
+        <p className="text-sm font-semibold text-slate-500">Iniciando ambiente seguro...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
+  }
+
+  const userDisplayName = currentUser.displayName || currentUser.email.split('@')[0];
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
 
@@ -132,7 +163,6 @@ export default function App() {
               Projetos
             </span>
 
-            {/* Botão Lilás / Roxo "Selecionar projeto" com Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -142,14 +172,12 @@ export default function App() {
                 <ChevronDown size={14} className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Menu suspenso (Dropdown) flutuante */}
               {dropdownOpen && (
                 <div className="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50 animate-fade-in text-left">
                   <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
                     Selecionar Projeto
                   </div>
                   <div className="max-h-64 overflow-y-auto">
-                    {/* Atalho para ir para a lista de projetos */}
                     <button
                       onClick={() => {
                         setSelectedProject(null);
@@ -159,8 +187,6 @@ export default function App() {
                     >
                       Ver todos os projetos (Lista)
                     </button>
-
-                    {/* Lista rápida de projetos */}
                     {projects.map((project) => (
                       <button
                         key={project.id_projeto}
@@ -180,7 +206,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Tag do Projeto Selecionado em Lilás */}
             {selectedProject && (
               <span className="text-xs px-2.5 py-1 rounded-full border border-brand-200 bg-brand-50 text-brand-700 font-bold ml-2 animate-fade-in">
                 {selectedProject.nome}
@@ -189,7 +214,7 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Lado Direito: Notificações, Dúvidas, Foto de Usuário */}
+        {/* Lado Direito: Notificações, Dúvidas, Perfil e Sair */}
         <div className="flex items-center gap-4">
           <button
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
@@ -208,21 +233,37 @@ export default function App() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
           </button>
 
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 cursor-pointer">
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
             <img
-              src="https://api.dicebear.com/7.x/adventurer/svg?seed=Vinicius"
+              src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${userDisplayName}`}
               alt="Avatar do Usuário"
               className="w-8 h-8 rounded-full border border-slate-200 bg-slate-100 object-cover"
             />
-            <span className="hidden md:inline text-xs font-bold text-slate-700">Vinicius</span>
+            <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight">
+              {userDisplayName}
+            </span>
           </div>
+
+          <button
+            onClick={handleLogout}
+            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+            title="Sair da Sessão"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6">
         {!selectedProject ? (
-          <ProjectList projects={projects} onSelectProject={(project) => setSelectedProject(project)} />
+          // Passamos a lista de projetos, a função de criação e o nome do usuário logado
+          <ProjectList
+            projects={projects}
+            onSelectProject={(project) => setSelectedProject(project)}
+            onCreateProject={handleCreateProject}
+            userDisplayName={userDisplayName}
+          />
         ) : (
           /* Tela Provisória do Projeto Selecionado */
           <div className="text-center py-20 max-w-md mx-auto bg-white border border-slate-200 rounded-2xl p-8 shadow-sm mt-10">
