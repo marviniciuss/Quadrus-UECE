@@ -136,12 +136,12 @@ export default function App() {
 
   // Função para adicionar um novo projeto na lista
   const handleCreateProject = (newProject) => {
-    setProjects([...projects, newProject]);
+    setProjects(prev => [...prev, newProject]);
   };
 
   // Função para atualizar dados de um projeto existente (ex: mover cartões, adicionar atividades)
   const handleUpdateProject = (updatedProject) => {
-    setProjects(projects.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
+    setProjects(prev => prev.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
     setSelectedProject(updatedProject);
   };
 

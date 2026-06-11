@@ -14,12 +14,11 @@ import {
   ChevronDown,
   X,
   UserPlus,
-  ArrowRight,
   Sparkles,
   Menu
 } from 'lucide-react';
 
-export default function KanbanBoard({ project, onUpdateProject, userDisplayName }) {
+export default function KanbanBoard({ project, onUpdateProject }) {
   // Estado para controlar a aba ativa no Menu Lateral
   const [activeTab, setActiveTab] = useState('board'); // 'board', 'sprint', 'metrics', 'settings'
 
@@ -194,7 +193,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'board'
                   ? 'bg-brand-50 text-brand-700 shadow-sm border-l-4 border-brand-600'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-55 hover:bg-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               <FolderKanban size={18} />
@@ -206,7 +205,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'sprint'
                   ? 'bg-brand-50 text-brand-700 shadow-sm border-l-4 border-brand-600'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-55 hover:bg-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               <Calendar size={18} />
@@ -218,7 +217,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'metrics'
                   ? 'bg-brand-50 text-brand-700 shadow-sm border-l-4 border-brand-600'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-55 hover:bg-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               <TrendingUp size={18} />
@@ -230,7 +229,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                 activeTab === 'settings'
                   ? 'bg-brand-50 text-brand-700 shadow-sm border-l-4 border-brand-600'
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-55 hover:bg-slate-100'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
             >
               <Settings size={18} />
@@ -252,7 +251,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
       {sidebarOpen && (
         <div 
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 bg-slate-900/20 backdrop-blur-xs z-30 md:hidden"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-30 md:hidden"
         />
       )}
 
@@ -262,7 +261,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
         {activeTab === 'board' ? (
           <>
             {/* ================= BARRA DE FERRAMENTAS / TOOLBAR ================= */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-xs mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               
               {/* Esquerda: Membros e Filtros Rápidos */}
               <div className="flex flex-wrap items-center gap-4">
@@ -304,7 +303,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
                       onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
                       className={`px-3 py-1.5 rounded-lg font-semibold text-[10px] border transition-all active:scale-95 ${
                         selectedTag === tag
-                          ? 'bg-brand-600 border-brand-600 text-white shadow-xs'
+                          ? 'bg-brand-600 border-brand-600 text-white shadow-sm'
                           : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
@@ -380,7 +379,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
                     key={col.id}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-72 p-4 shrink-0 shadow-xs"
+                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-72 p-4 shrink-0 shadow-sm"
                   >
                     {/* Header da Coluna */}
                     <div className="flex items-center justify-between mb-4">
@@ -426,7 +425,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
                               onDragStart={(e) => handleDragStart(e, card.id_card)}
                               onDragEnd={handleDragEnd}
                               className={`
-                                group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-xs hover:shadow-md hover:border-brand-300 cursor-grab active:cursor-grabbing transition-all duration-200 relative
+                                group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-grab active:cursor-grabbing transition-all duration-200 relative
                                 ${borderAccentColor}
                               `}
                             >
@@ -516,7 +515,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
                               </div>
 
                               {/* Controle de movimentação rápida para telas touch/mobile */}
-                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-white shadow-xs rounded border border-slate-100 p-0.5">
+                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-white shadow-sm rounded border border-slate-100 p-0.5">
                                 {col.id !== 'A_FAZER' && (
                                   <button
                                     onClick={() => {
@@ -566,7 +565,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
           </>
         ) : activeTab === 'sprint' ? (
           /* ================= TELA PLANEJAMENTO DE SPRINT ================= */
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs text-center max-w-lg mx-auto mt-10">
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
             <Calendar className="mx-auto text-brand-600 mb-4 animate-bounce" size={40} />
             <h2 className="text-xl font-extrabold text-slate-800">Planejamento de Sprint</h2>
             <p className="text-slate-500 mt-2 text-sm leading-relaxed">
@@ -579,7 +578,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
           </div>
         ) : activeTab === 'metrics' ? (
           /* ================= TELA MÉTRICAS ================= */
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs text-center max-w-lg mx-auto mt-10">
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
             <TrendingUp className="mx-auto text-brand-600 mb-4 animate-pulse" size={40} />
             <h2 className="text-xl font-extrabold text-slate-800">Métricas de Equipe e Performance</h2>
             <p className="text-slate-500 mt-2 text-sm leading-relaxed">
@@ -592,7 +591,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
           </div>
         ) : (
           /* ================= TELA CONFIGURAÇÕES ================= */
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xs text-center max-w-lg mx-auto mt-10">
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
             <Settings className="mx-auto text-brand-600 mb-4 rotate-45 transition-transform" size={40} />
             <h2 className="text-xl font-extrabold text-slate-800">Configurações do Projeto</h2>
             <p className="text-slate-500 mt-2 text-sm leading-relaxed">
@@ -609,7 +608,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
 
       {/* ================================= MODAL DE NOVA ATIVIDADE ================================= */}
       {isNewCardModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg shadow-2xl relative overflow-hidden text-left p-6 md:p-8 animate-scale-up">
             
@@ -689,7 +688,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
                       onClick={() => setNewCardPriority(p.id)}
                       className={`py-2 px-3 border rounded-xl text-center font-bold text-[10px] transition-all ${
                         newCardPriority === p.id 
-                          ? 'border-brand-600 bg-brand-600 text-white shadow-xs scale-98' 
+                          ? 'border-brand-600 bg-brand-600 text-white shadow-sm scale-[0.98]' 
                           : p.color
                       }`}
                     >
