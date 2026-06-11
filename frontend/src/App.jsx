@@ -11,6 +11,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './utils/firebaseConfig.js';
 import ProjectList from './components/ProjectList.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
+import KanbanBoard from './components/KanbanBoard.jsx';
 
 const MOCK_PROJECTS = [
   {
@@ -25,11 +26,60 @@ const MOCK_PROJECTS = [
       { id_usuario: '4', nome: 'Victoria', perfil: 'GERENTE' },
     ],
     cards: [
-      { status: 'CONCLUIDO' },
-      { status: 'EM_ANDAMENTO' },
-      { status: 'A_FAZER' },
-      { status: 'CONCLUIDO' },
-      { status: 'HOMOLOGACAO' },
+      {
+        id_card: 'US05',
+        titulo: 'Criação de Webhooks para Integração com Slack API',
+        status: 'A_FAZER',
+        prioridade: 'MEDIA',
+        tags: ['BACKEND', 'DEVOPS'],
+        membros: [{ id_usuario: '1', nome: 'Joel' }],
+        prazo: '2026-07-01T00:00:00.000Z',
+        pontos: 5
+      },
+      {
+        id_card: 'US09',
+        titulo: 'Implementar Mecanismo de Notificação em Tempo Real',
+        status: 'EM_ANDAMENTO',
+        prioridade: 'ALTA',
+        tags: ['BACKEND'],
+        membros: [{ id_usuario: '2', nome: 'Juan' }],
+        prazo: '2026-06-25T00:00:00.000Z',
+        pontos: 8,
+        comentariosCount: 1,
+        anexosCount: 3
+      },
+      {
+        id_card: 'US12',
+        titulo: 'Desenvolvimento do Dashboard de Métricas de Performance',
+        status: 'EM_ANDAMENTO',
+        prioridade: 'MEDIA',
+        tags: ['FRONTEND', 'DESIGN'],
+        membros: [{ id_usuario: '3', nome: 'Vinicius' }],
+        prazo: '2026-06-12T00:00:00.000Z',
+        atrasado: true,
+        pontos: 13,
+        anexosCount: 3
+      },
+      {
+        id_card: 'US08',
+        titulo: 'Implementação de Dark Mode no Editor Principal',
+        status: 'HOMOLOGACAO',
+        prioridade: 'MEDIA',
+        tags: ['FRONTEND'],
+        membros: [{ id_usuario: '4', nome: 'Victoria' }],
+        prazo: '2026-06-20T00:00:00.000Z',
+        pontos: 3
+      },
+      {
+        id_card: 'US01',
+        titulo: 'Estrutura Inicial de Banco de Dados Postgre',
+        status: 'CONCLUIDO',
+        prioridade: 'BAIXA',
+        tags: ['BACKEND'],
+        membros: [{ id_usuario: '1', nome: 'Joel' }],
+        prazo: '2026-05-20T00:00:00.000Z',
+        pontos: 8
+      }
     ],
     createdAt: '2026-05-10T00:00:00.000Z',
   },
@@ -44,9 +94,16 @@ const MOCK_PROJECTS = [
       { id_usuario: '6', nome: 'Matheus', perfil: 'TESTER' },
     ],
     cards: [
-      { status: 'CONCLUIDO' },
-      { status: 'CONCLUIDO' },
-      { status: 'CONCLUIDO' },
+      {
+        id_card: 'US02',
+        titulo: 'Mapeamento de Rotas Acadêmicas no React Router',
+        status: 'CONCLUIDO',
+        prioridade: 'MEDIA',
+        tags: ['FRONTEND'],
+        membros: [{ id_usuario: '1', nome: 'Joel' }],
+        prazo: '2026-05-25T00:00:00.000Z',
+        pontos: 5
+      }
     ],
     createdAt: '2026-05-01T00:00:00.000Z',
   },
@@ -59,10 +116,7 @@ const MOCK_PROJECTS = [
       { id_usuario: '3', nome: 'Vinicius', perfil: 'GERENTE' },
       { id_usuario: '2', nome: 'Juan', perfil: 'DEV' },
     ],
-    cards: [
-      { status: 'A_FAZER' },
-      { status: 'A_FAZER' },
-    ],
+    cards: [],
     createdAt: '2026-05-15T00:00:00.000Z',
   }
 ];
@@ -83,6 +137,12 @@ export default function App() {
   // Função para adicionar um novo projeto na lista
   const handleCreateProject = (newProject) => {
     setProjects([...projects, newProject]);
+  };
+
+  // Função para atualizar dados de um projeto existente (ex: mover cartões, adicionar atividades)
+  const handleUpdateProject = (updatedProject) => {
+    setProjects(projects.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
+    setSelectedProject(updatedProject);
   };
 
   useEffect(() => {
@@ -255,7 +315,7 @@ export default function App() {
       </header>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-6">
+      <main className={`flex-1 w-full mx-auto p-4 md:p-6 transition-all duration-300 ${selectedProject ? 'max-w-full px-6 md:px-8' : 'max-w-7xl'}`}>
         {!selectedProject ? (
           // Passamos a lista de projetos, a função de criação e o nome do usuário logado
           <ProjectList
@@ -265,18 +325,12 @@ export default function App() {
             userDisplayName={userDisplayName}
           />
         ) : (
-          /* Tela Provisória do Projeto Selecionado */
-          <div className="text-center py-20 max-w-md mx-auto bg-white border border-slate-200 rounded-2xl p-8 shadow-sm mt-10">
-            <h2 className="text-2xl font-extrabold text-brand-600">Você abriu: {selectedProject.nome}</h2>
-            <p className="text-slate-500 mt-2 text-sm">O próximo passo será construirmos o Quadro Kanban aqui dentro.</p>
-
-            <button
-              onClick={() => setSelectedProject(null)}
-              className="mt-6 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md shadow-brand-500/10"
-            >
-              Voltar para a Lista de Projetos
-            </button>
-          </div>
+          /* Novo Quadro Kanban Interativo */
+          <KanbanBoard
+            project={selectedProject}
+            onUpdateProject={handleUpdateProject}
+            userDisplayName={userDisplayName}
+          />
         )}
       </main>
 
