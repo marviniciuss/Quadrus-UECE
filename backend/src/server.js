@@ -5,6 +5,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { verifyFirebaseToken } from './middlewares/auth.middleware.js';
+import projetoRoutes from "./routes/projetoRoutes.js";
+import usuarioRoutes from "./routes/usuarioRoutes.js";
 
 dotenv.config();
 
@@ -91,3 +93,6 @@ app.use((err, req, res, next) => {
 httpServer.listen(PORT, () => {
   console.log(`Quadrus Backend Server running on port ${PORT}`);
 });
+
+app.use("/api/projetos", projetoRoutes);
+app.use("/api/usuarios", usuarioRoutes);
