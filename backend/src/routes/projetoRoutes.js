@@ -1,4 +1,5 @@
 import express from "express";
+import { verifyFirebaseToken } from "../middlewares/auth.middleware.js";
 import {
   listarProjetos,
   obterProjeto,
@@ -10,11 +11,11 @@ import {
 
 const router = express.Router();
 
-router.get("/", listarProjetos);
-router.get("/:id", obterProjeto);
-router.post("/", criarProjeto);
-router.patch("/:id", atualizarProjeto);
-router.delete("/:id", deletarProjeto);
-router.post("/:id/membros", adicionarMembro);
+router.get("/", verifyFirebaseToken, listarProjetos);
+router.get("/:id", verifyFirebaseToken, obterProjeto);
+router.post("/", verifyFirebaseToken, criarProjeto);
+router.patch("/:id", verifyFirebaseToken, atualizarProjeto);
+router.delete("/:id", verifyFirebaseToken, deletarProjeto);
+router.post("/:id/membros", verifyFirebaseToken, adicionarMembro);
 
 export default router;

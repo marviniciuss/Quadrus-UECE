@@ -1,4 +1,5 @@
 import express from "express";
+import { verifyFirebaseToken } from "../middlewares/auth.middleware.js";
 import {
   listarUsuarios,
   buscarUsuarioPorId,
@@ -9,10 +10,10 @@ import {
 
 const router = express.Router();
 
-router.get("/", listarUsuarios);
-router.get("/:id", buscarUsuarioPorId);
-router.post("/", criarUsuario);
-router.put("/:id", atualizarUsuario);
-router.delete("/:id", deletarUsuario);
+router.get("/", verifyFirebaseToken, listarUsuarios);
+router.get("/:id", verifyFirebaseToken, buscarUsuarioPorId);
+router.post("/", verifyFirebaseToken, criarUsuario);
+router.patch("/:id", verifyFirebaseToken, atualizarUsuario);
+router.delete("/:id", verifyFirebaseToken, deletarUsuario);
 
 export default router;

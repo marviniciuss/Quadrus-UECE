@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 /* =========================
    LISTAR PROJETOS
@@ -17,6 +15,7 @@ export const listarProjetos = async (req, res) => {
 
     return res.json(projetos);
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao listar projetos" });
   }
 };
@@ -43,6 +42,7 @@ export const obterProjeto = async (req, res) => {
 
     return res.json(projeto);
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao buscar projeto" });
   }
 };
@@ -54,6 +54,12 @@ export const criarProjeto = async (req, res) => {
   const { nome, descricao, data_prazo } = req.body;
 
   try {
+    if (!nome) {
+      return res.status(400).json({
+        error: "Nome do projeto é obrigatório",
+      });
+    }
+
     const projeto = await prisma.projeto.create({
       data: {
         nome,
@@ -64,6 +70,7 @@ export const criarProjeto = async (req, res) => {
 
     return res.status(201).json(projeto);
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao criar projeto" });
   }
 };
@@ -76,17 +83,28 @@ export const atualizarProjeto = async (req, res) => {
   const { nome, descricao, data_prazo } = req.body;
 
   try {
+    const projetoExistente = await prisma.projeto.findUnique({
+      where: { id_projeto: id },
+    });
+
+    if (!projetoExistente) {
+      return res.status(404).json({ error: "Projeto não encontrado" });
+    }
+
     const projeto = await prisma.projeto.update({
       where: { id_projeto: id },
       data: {
-        ...(nome && { nome }),
-        ...(descricao && { descricao }),
-        ...(data_prazo && { data_prazo: new Date(data_prazo) }),
+        ...(nome !== undefined && { nome }),
+        ...(descricao !== undefined && { descricao }),
+        ...(data_prazo !== undefined && {
+          data_prazo: data_prazo ? new Date(data_prazo) : null,
+        }),
       },
     });
 
     return res.json(projeto);
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao atualizar projeto" });
   }
 };
@@ -110,8 +128,9 @@ export const deletarProjeto = async (req, res) => {
       where: { id_projeto: id },
     });
 
-    return res.json({ message: "Projeto removido com sucesso" });
+    return res.json({ mensagem: "Projeto removido com sucesso" });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao deletar projeto" });
   }
 };
@@ -169,6 +188,7 @@ export const adicionarMembro = async (req, res) => {
 
     return res.status(201).json(membro);
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ error: "Erro ao adicionar membro" });
   }
 };
