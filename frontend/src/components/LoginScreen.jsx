@@ -10,65 +10,36 @@ export default function LoginScreen({ onLoginSuccess }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-
-
-    /*
-     const handleLogin = async (e) => {
-         e.preventDefault();
-         setLoading(true);
-         setError(null);
- 
-         try {
-             // Autenticação oficial no Firebase Auth
-             await signInWithEmailAndPassword(auth, email, password);
-         } catch (err) {
-             console.error('Login error:', err);
-             // Mensagens de erro amigáveis em português
-             if (err.code === 'auth/invalid-credential') {
-                 setError('E-mail ou senha incorretos. Por favor, tente novamente.');
-             } else if (err.code === 'auth/invalid-email') {
-                 setError('O formato do e-mail inserido é inválido.');
-             } else {
-                 setError('Ocorreu um erro ao conectar ao servidor de autenticação.');
-             }
-         } finally {
-             setLoading(false);
-         }
-     };
- 
-     */
-
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        // Simula um atraso de rede de 1 segundo (para ver o botão carregando)
-        setTimeout(() => {
-            setLoading(false);
-
-            // Validação simples: exige senha com pelo menos 6 caracteres
-            if (password.length < 6) {
-                setError('A senha deve ter pelo menos 6 caracteres.');
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            onLoginSuccess(userCredential.user);
+        } catch (err) {
+            console.error('Login error:', err);
+            if (err.code === 'auth/invalid-credential') {
+                setError('E-mail ou senha incorretos. Por favor, tente novamente.');
+            } else if (err.code === 'auth/invalid-email') {
+                setError('O formato do e-mail inserido é inválido.');
+            } else if (err.code === 'auth/user-not-found') {
+                setError('Usuário não encontrado.');
+            } else if (err.code === 'auth/wrong-password') {
+                setError('Senha incorreta.');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('Muitas tentativas. Tente novamente mais tarde.');
             } else {
-                // Executa a função de sucesso passando os dados do e-mail digitado
-                onLoginSuccess({
-                    email: email,
-                    displayName: email.split('@')[0] // usa o nome antes do @ como nome de exibição
-                });
+                setError('Ocorreu um erro ao conectar ao servidor de autenticação.');
             }
-        }, 1000);
+        } finally {
+            setLoading(false);
+        }
     };
-
-
-
-
-
-
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-stretch font-sans text-slate-800">
-
             {/* 1. LADO ESQUERDO: Painel de Apresentação (Escondido no celular, visível md para cima) */}
             <div className="hidden lg:flex lg:w-1/2 bg-[#320066] text-white flex-col justify-between p-12 relative overflow-hidden">
                 {/* Efeito de círculo de luz no fundo */}

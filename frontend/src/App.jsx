@@ -123,7 +123,7 @@ const MOCK_PROJECTS = [
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(false); // Mantemos desativado para testar offline
+  const [authLoading, setAuthLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState('checking');
   const [socketStatus, setSocketStatus] = useState('offline');
   const [selectedProject, setSelectedProject] = useState(null);
@@ -144,6 +144,14 @@ export default function App() {
     setProjects(prev => prev.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
     setSelectedProject(updatedProject);
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -176,7 +184,12 @@ export default function App() {
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     setCurrentUser(null);
     setSelectedProject(null);
   };
