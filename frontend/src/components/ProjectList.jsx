@@ -8,10 +8,11 @@ import {
     Clock,
     Briefcase,
     X,
-    Calendar
+    Calendar,
+    Loader2
 } from 'lucide-react';
 
-export default function ProjectList({ projects, onSelectProject, onCreateProject, userDisplayName }) {
+export default function ProjectList({ projects, projectsLoading, onSelectProject, onCreateProject, userDisplayName }) {
     const [searchTerm, setSearchTerm] = useState('');
 
     // Estados para controlar o formulário do Novo Projeto
@@ -19,8 +20,11 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
     const [nome, setNome] = useState('');
     const [descricao, setDescricao] = useState('');
     const [prazo, setPrazo] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState(null);
 
     const getDaysRemaining = (dateString) => {
+        if (!dateString) return null;
         const deadline = new Date(dateString);
         const today = new Date();
         const diffTime = deadline - today;
@@ -30,40 +34,45 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
 
     const filteredProjects = projects.filter(project =>
         project.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.descricao.toLowerCase().includes(searchTerm.toLowerCase())
+        (project.descricao || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     // Envio do formulário de criação de projeto
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!nome || !descricao || !prazo) return;
 
-        // Estrutura o novo projeto conforme a modelagem
-        const newProject = {
-            id_projeto: String(projects.length + 1), // Gera um ID fictício incremental
-            nome: nome,
-            descricao: descricao,
-            data_prazo: new Date(prazo).toISOString(),
-            membros: [
-                {
-                    id_usuario: 'user-owner',
-                    nome: userDisplayName || 'Vinicius',
-                    perfil: 'GERENTE' // Criador padrão entra como GERENTE
-                }
-            ],
-            cards: [], // Inicia com 0 cartões
-            createdAt: new Date().toISOString()
-        };
+        setCreating(true);
+        setCreateError(null);
 
-        // Salva o projeto e fecha o modal
-        onCreateProject(newProject);
+        try {
+            await onCreateProject({
+                nome,
+                descricao,
+                data_prazo: new Date(prazo).toISOString(),
+            });
 
-        // Reseta os campos do formulário
-        setNome('');
-        setDescricao('');
-        setPrazo('');
-        setIsModalOpen(false);
+            // Reseta os campos do formulário
+            setNome('');
+            setDescricao('');
+            setPrazo('');
+            setIsModalOpen(false);
+        } catch (error) {
+            setCreateError('Erro ao criar projeto. Tente novamente.');
+        } finally {
+            setCreating(false);
+        }
     };
+
+    // Estado de carregamento
+    if (projectsLoading) {
+        return (
+            <div className="w-full max-w-4xl mx-auto px-4 py-16 flex flex-col items-center justify-center">
+                <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
+                <p className="text-sm font-semibold text-slate-500">Carregando seus projetos...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full max-w-4xl mx-auto px-4 py-6 relative">
@@ -84,8 +93,8 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
             {filteredProjects.length > 0 ? (
                 <div className="space-y-4">
                     {filteredProjects.map((project) => {
-                        const totalCards = project.cards.length;
-                        const completedCards = project.cards.filter(c => c.status === 'CONCLUIDO').length;
+                        const totalCards = (project.cards || []).length;
+                        const completedCards = (project.cards || []).filter(c => c.status === 'CONCLUIDO').length;
                         const progressPercentage = totalCards > 0 ? Math.round((completedCards / totalCards) * 100) : 0;
                         const daysLeft = getDaysRemaining(project.data_prazo);
 
@@ -116,21 +125,23 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
                                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                                         <span className="flex items-center gap-1 font-medium bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
                                             <Users size={14} className="text-slate-400" />
-                                            {project.membros.length} membros
+                                            {(project.membros || []).length} {(project.membros || []).length === 1 ? 'membro' : 'membros'}
                                         </span>
 
                                         <span className="flex items-center gap-1 font-medium bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg">
                                             <CheckSquare size={14} className="text-slate-400" />
-                                            {totalCards} tarefas
+                                            {totalCards} {totalCards === 1 ? 'tarefa' : 'tarefas'}
                                         </span>
 
-                                        <span className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 ${daysLeft < 20
-                                            ? 'bg-rose-50 border-rose-100 text-rose-700'
-                                            : 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                                            }`}>
-                                            <Clock size={12} />
-                                            {daysLeft > 0 ? `${daysLeft} dias restantes` : 'Atrasado'}
-                                        </span>
+                                        {daysLeft !== null && (
+                                            <span className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 ${daysLeft < 20
+                                                ? 'bg-rose-50 border-rose-100 text-rose-700'
+                                                : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                                                }`}>
+                                                <Clock size={12} />
+                                                {daysLeft > 0 ? `${daysLeft} ${daysLeft === 1 ? 'dia restante' : 'dias restantes'}` : 'Atrasado'}
+                                            </span>
+                                        )}
                                     </div>
 
                                     <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
@@ -159,14 +170,19 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
             ) : (
                 <div className="text-center py-16 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
                     <Briefcase className="mx-auto text-slate-400 mb-3" size={40} />
-                    <h3 className="font-bold text-lg text-slate-800">Nenhum projeto encontrado</h3>
+                    <h3 className="font-bold text-lg text-slate-800">
+                        {projects.length === 0 ? 'Você ainda não participa de nenhum projeto' : 'Nenhum projeto encontrado'}
+                    </h3>
+                    {projects.length === 0 && (
+                        <p className="text-sm text-slate-500 mt-2">Crie um novo projeto para começar a gerenciar suas tarefas.</p>
+                    )}
                 </div>
             )}
 
             {/* Botão Novo Projeto que agora abre o modal */}
             <div className="mt-12 flex justify-center">
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => { setIsModalOpen(true); setCreateError(null); }}
                     className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/20 active:scale-95 shadow-md shadow-brand-500/10"
                 >
                     <Plus size={18} />
@@ -197,6 +213,13 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
                                 <X size={18} />
                             </button>
                         </div>
+
+                        {/* Alerta de Erro */}
+                        {createError && (
+                            <div className="mb-4 flex items-center gap-2 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-100 p-3 rounded-xl">
+                                <span>{createError}</span>
+                            </div>
+                        )}
 
                         {/* Formulário */}
                         <form onSubmit={handleSubmit} className="space-y-5">
@@ -253,15 +276,18 @@ export default function ProjectList({ projects, onSelectProject, onCreateProject
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs transition-colors"
+                                    disabled={creating}
+                                    className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs transition-colors disabled:opacity-50"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98]"
+                                    disabled={creating}
+                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    Criar Projeto
+                                    {creating && <Loader2 size={14} className="animate-spin" />}
+                                    {creating ? 'Criando...' : 'Criar Projeto'}
                                 </button>
                             </div>
 

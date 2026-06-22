@@ -7,9 +7,14 @@ export const listarProjetos = async (req, res) => {
   try {
     const projetos = await prisma.projeto.findMany({
       include: {
-        membros: true,
+        membros: {
+          include: { usuario: true },
+        },
         sprints: true,
-        cards: true,
+        cards: {
+          where: { deletado_em: null },
+          include: { responsavel: true },
+        },
       },
     });
 
@@ -17,6 +22,43 @@ export const listarProjetos = async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Erro ao listar projetos" });
+  }
+};
+
+/* =========================
+   LISTAR PROJETOS DO USUÁRIO LOGADO
+========================= */
+export const listarProjetosDoUsuario = async (req, res) => {
+  try {
+    const emailUsuario = req.user.email;
+
+    const projetos = await prisma.projeto.findMany({
+      where: {
+        membros: {
+          some: {
+            usuario: {
+              email: emailUsuario,
+            },
+          },
+        },
+      },
+      include: {
+        membros: {
+          include: { usuario: true },
+        },
+        sprints: true,
+        cards: {
+          where: { deletado_em: null },
+          include: { responsavel: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(projetos);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao listar projetos do usuário" });
   }
 };
 
@@ -30,9 +72,14 @@ export const obterProjeto = async (req, res) => {
     const projeto = await prisma.projeto.findUnique({
       where: { id_projeto: id },
       include: {
-        membros: true,
+        membros: {
+          include: { usuario: true },
+        },
         sprints: true,
-        cards: true,
+        cards: {
+          where: { deletado_em: null },
+          include: { responsavel: true },
+        },
       },
     });
 
@@ -60,11 +107,35 @@ export const criarProjeto = async (req, res) => {
       });
     }
 
+    // Buscar o usuário logado pelo email do token Firebase
+    const emailUsuario = req.user.email;
+    const usuario = await prisma.usuario.findUnique({
+      where: { email: emailUsuario },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuário autenticado não encontrado no banco" });
+    }
+
+    // Criar o projeto e adicionar o criador como GERENTE automaticamente
     const projeto = await prisma.projeto.create({
       data: {
         nome,
         descricao,
         data_prazo: data_prazo ? new Date(data_prazo) : null,
+        membros: {
+          create: {
+            id_usuario: usuario.id_usuario,
+            perfil: "GERENTE",
+          },
+        },
+      },
+      include: {
+        membros: {
+          include: { usuario: true },
+        },
+        sprints: true,
+        cards: true,
       },
     });
 

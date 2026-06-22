@@ -122,6 +122,7 @@ model Card {
   status         StatusCard       @default(A_FAZER)
   story_points   Int?
   em_risco       Boolean          @default(false)
+  tags           String[]         @default([])
   deletado_em    DateTime?        @db.Timestamp
   
   projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)

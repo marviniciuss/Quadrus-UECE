@@ -14,114 +14,6 @@ import ProjectList from './components/ProjectList.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import KanbanBoard from './components/KanbanBoard.jsx';
 
-const MOCK_PROJECTS = [
-  {
-    id_projeto: '1',
-    nome: 'Quadrus - Kanban Colaborativo',
-    descricao: 'Desenvolvimento do monorepo Quadrus utilizando React, Tailwind, Node e Socket.io para a disciplina de Engenharia de Software.',
-    data_prazo: '2026-07-15T00:00:00.000Z',
-    membros: [
-      { id_usuario: '1', nome: 'Joel', perfil: 'PO' },
-      { id_usuario: '2', nome: 'Juan', perfil: 'DEV' },
-      { id_usuario: '3', nome: 'Vinicius', perfil: 'DEV' },
-      { id_usuario: '4', nome: 'Victoria', perfil: 'GERENTE' },
-    ],
-    cards: [
-      {
-        id_card: 'US05',
-        titulo: 'Criação de Webhooks para Integração com Slack API',
-        status: 'A_FAZER',
-        prioridade: 'MEDIA',
-        tags: ['BACKEND', 'DEVOPS'],
-        membros: [{ id_usuario: '1', nome: 'Joel' }],
-        prazo: '2026-07-01T00:00:00.000Z',
-        pontos: 5
-      },
-      {
-        id_card: 'US09',
-        titulo: 'Implementar Mecanismo de Notificação em Tempo Real',
-        status: 'EM_ANDAMENTO',
-        prioridade: 'ALTA',
-        tags: ['BACKEND'],
-        membros: [{ id_usuario: '2', nome: 'Juan' }],
-        prazo: '2026-06-25T00:00:00.000Z',
-        pontos: 8,
-        comentariosCount: 1,
-        anexosCount: 3
-      },
-      {
-        id_card: 'US12',
-        titulo: 'Desenvolvimento do Dashboard de Métricas de Performance',
-        status: 'EM_ANDAMENTO',
-        prioridade: 'MEDIA',
-        tags: ['FRONTEND', 'DESIGN'],
-        membros: [{ id_usuario: '3', nome: 'Vinicius' }],
-        prazo: '2026-06-12T00:00:00.000Z',
-        atrasado: true,
-        pontos: 13,
-        anexosCount: 3
-      },
-      {
-        id_card: 'US08',
-        titulo: 'Implementação de Dark Mode no Editor Principal',
-        status: 'HOMOLOGACAO',
-        prioridade: 'MEDIA',
-        tags: ['FRONTEND'],
-        membros: [{ id_usuario: '4', nome: 'Victoria' }],
-        prazo: '2026-06-20T00:00:00.000Z',
-        pontos: 3
-      },
-      {
-        id_card: 'US01',
-        titulo: 'Estrutura Inicial de Banco de Dados Postgre',
-        status: 'CONCLUIDO',
-        prioridade: 'BAIXA',
-        tags: ['BACKEND'],
-        membros: [{ id_usuario: '1', nome: 'Joel' }],
-        prazo: '2026-05-20T00:00:00.000Z',
-        pontos: 8
-      }
-    ],
-    createdAt: '2026-05-10T00:00:00.000Z',
-  },
-  {
-    id_projeto: '2',
-    nome: 'UECE - Portal de Alunos',
-    descricao: 'Redesign da interface e migração do portal acadêmico dos alunos da UECE para React e Tailwind.',
-    data_prazo: '2026-06-20T00:00:00.000Z',
-    membros: [
-      { id_usuario: '1', nome: 'Joel', perfil: 'DEV' },
-      { id_usuario: '5', nome: 'Felipe', perfil: 'PO' },
-      { id_usuario: '6', nome: 'Matheus', perfil: 'TESTER' },
-    ],
-    cards: [
-      {
-        id_card: 'US02',
-        titulo: 'Mapeamento de Rotas Acadêmicas no React Router',
-        status: 'CONCLUIDO',
-        prioridade: 'MEDIA',
-        tags: ['FRONTEND'],
-        membros: [{ id_usuario: '1', nome: 'Joel' }],
-        prazo: '2026-05-25T00:00:00.000Z',
-        pontos: 5
-      }
-    ],
-    createdAt: '2026-05-01T00:00:00.000Z',
-  },
-  {
-    id_projeto: '3',
-    nome: 'Dashboard de Métricas - RDA',
-    descricao: 'Módulo analítico com logs de governança de sprint e gráficos automatizados de Velocity.',
-    data_prazo: '2026-08-01T00:00:00.000Z',
-    membros: [
-      { id_usuario: '3', nome: 'Vinicius', perfil: 'GERENTE' },
-      { id_usuario: '2', nome: 'Juan', perfil: 'DEV' },
-    ],
-    cards: [],
-    createdAt: '2026-05-15T00:00:00.000Z',
-  }
-];
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -130,20 +22,54 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Agora a lista de projetos é um estado mutável
-  const [projects, setProjects] = useState(MOCK_PROJECTS);
+  // Lista de projetos carregada do backend
+  const [projects, setProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
 
   const dropdownRef = useRef(null);
 
-  // Função para adicionar um novo projeto na lista
-  const handleCreateProject = (newProject) => {
-    setProjects(prev => [...prev, newProject]);
+  // Função para buscar projetos do usuário logado no backend
+  const fetchProjects = async () => {
+    setProjectsLoading(true);
+    try {
+      const res = await api.get('/api/projetos/meus');
+      setProjects(res.data);
+    } catch (error) {
+      console.error('Erro ao buscar projetos:', error);
+    } finally {
+      setProjectsLoading(false);
+    }
   };
 
-  // Função para atualizar dados de um projeto existente (ex: mover cartões, adicionar atividades)
+  // Função para criar um novo projeto via API
+  const handleCreateProject = async ({ nome, descricao, data_prazo }) => {
+    try {
+      const res = await api.post('/api/projetos', { nome, descricao, data_prazo });
+      // Adiciona o projeto retornado à lista local
+      setProjects(prev => [res.data, ...prev]);
+      return res.data;
+    } catch (error) {
+      console.error('Erro ao criar projeto:', error);
+      throw error;
+    }
+  };
+
+  // Função para atualizar dados de um projeto existente no estado local
   const handleUpdateProject = (updatedProject) => {
     setProjects(prev => prev.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
     setSelectedProject(updatedProject);
+  };
+
+  const handleLoginSuccess = async (user) => {
+    try {
+      const nome = user.displayName || user.email.split('@')[0];
+      const email = user.email;
+      await api.post('/api/usuarios', { nome, email });
+      console.log('Usuário sincronizado após login/cadastro com nome:', nome);
+    } catch (error) {
+      console.error('Erro ao sincronizar após login/cadastro:', error);
+    }
+    setCurrentUser(user);
   };
 
   useEffect(() => {
@@ -163,6 +89,13 @@ export default function App() {
     });
     return unsubscribe;
   }, []);
+
+  // Quando o usuário logar, buscar seus projetos
+  useEffect(() => {
+    if (currentUser) {
+      fetchProjects();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -205,7 +138,7 @@ export default function App() {
     }
     setCurrentUser(null);
     setSelectedProject(null);
-    setProjects(MOCK_PROJECTS);
+    setProjects([]);
   };
 
   if (authLoading) {
@@ -218,7 +151,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   const userDisplayName = currentUser.displayName || currentUser.email.split('@')[0];
@@ -347,6 +280,7 @@ export default function App() {
           // Passamos a lista de projetos, a função de criação e o nome do usuário logado
           <ProjectList
             projects={projects}
+            projectsLoading={projectsLoading}
             onSelectProject={(project) => setSelectedProject(project)}
             onCreateProject={handleCreateProject}
             userDisplayName={userDisplayName}

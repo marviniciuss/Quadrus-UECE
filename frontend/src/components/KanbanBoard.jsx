@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import api from '../utils/api.js';
 import {
   FolderKanban,
   Calendar,
@@ -18,7 +19,7 @@ import {
   Menu
 } from 'lucide-react';
 
-export default function KanbanBoard({ project, onUpdateProject }) {
+export default function KanbanBoard({ project, onUpdateProject, userDisplayName }) {
   // Estado para controlar a aba ativa no Menu Lateral
   const [activeTab, setActiveTab] = useState('board'); // 'board', 'sprint', 'metrics', 'settings'
 
@@ -33,11 +34,11 @@ export default function KanbanBoard({ project, onUpdateProject }) {
   const [isNewCardModalOpen, setIsNewCardModalOpen] = useState(false);
 
   // Formulário para Nova Atividade
-  const [newCardId, setNewCardId] = useState('');
   const [newCardTitle, setNewCardTitle] = useState('');
   const [newCardPriority, setNewCardPriority] = useState('MEDIA');
   const [newCardTags, setNewCardTags] = useState([]);
   const [newCardMember, setNewCardMember] = useState('');
+  const [creatingCard, setCreatingCard] = useState(false);
 
   // Sprints Simuladas
   const [selectedSprint, setSelectedSprint] = useState('Sprint 24 (Atual)');
@@ -46,7 +47,12 @@ export default function KanbanBoard({ project, onUpdateProject }) {
   const sprints = ['Sprint 24 (Atual)', 'Sprint 23', 'Sprint 22'];
 
   // Pegar todos os membros do projeto para exibição e atribuição
-  const members = project.membros || [];
+  // A API retorna membros com { perfil, usuario: { id_usuario, nome, email } }
+  const members = (project.membros || []).map(m => ({
+    id_usuario: m.usuario?.id_usuario || m.id_usuario,
+    nome: m.usuario?.nome || m.nome || 'Membro',
+    perfil: m.perfil || 'DEV',
+  }));
 
   // Categorias de colunas (Status)
   const columns = [
@@ -75,7 +81,7 @@ export default function KanbanBoard({ project, onUpdateProject }) {
     const cardId = e.dataTransfer.getData('text/plain');
     if (!cardId) return;
 
-    // Atualiza o status do cartão movido no projeto ativo
+    // Atualiza o status do cartão movido no projeto ativo (otimistic update)
     const updatedCards = project.cards.map(card => {
       if (card.id_card === cardId) {
         return { ...card, status: targetStatus };
@@ -87,6 +93,10 @@ export default function KanbanBoard({ project, onUpdateProject }) {
       ...project,
       cards: updatedCards
     });
+
+    // Persistir no backend
+    api.patch(`/api/cards/${cardId}/status`, { status: targetStatus })
+      .catch(err => console.error('Erro ao persistir movimentação:', err));
   };
 
   // Mover cartão via clique (acessibilidade / mobile-friendly)
@@ -102,50 +112,56 @@ export default function KanbanBoard({ project, onUpdateProject }) {
       ...project,
       cards: updatedCards
     });
+
+    // Persistir no backend
+    api.patch(`/api/cards/${cardId}/status`, { status: targetStatus })
+      .catch(err => console.error('Erro ao persistir movimentação:', err));
   };
 
   // ================= FILTRO E BUSCA DE CARDS =================
   const filteredCards = (project.cards || []).filter(card => {
     const matchesSearch = card.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           card.id_card.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = selectedTag ? card.tags?.includes(selectedTag) : true;
+    const matchesTag = selectedTag ? (card.tags || []).includes(selectedTag) : true;
     return matchesSearch && matchesTag;
   });
 
   // ================= SUBMISSÃO DE NOVA ATIVIDADE =================
-  const handleCreateCard = (e) => {
+  const handleCreateCard = async (e) => {
     e.preventDefault();
-    if (!newCardTitle || !newCardId) return;
+    if (!newCardTitle) return;
 
-    // Achar membro atribuído
-    const assignedMember = members.find(m => m.nome === newCardMember) || { id_usuario: 'unknown', nome: newCardMember || 'Sem Responsável' };
+    setCreatingCard(true);
 
-    const newCard = {
-      id_card: newCardId.toUpperCase(),
-      titulo: newCardTitle,
-      status: 'A_FAZER',
-      prioridade: newCardPriority,
-      tags: newCardTags,
-      membros: [assignedMember],
-      prazo: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 dias a partir de agora
-      pontos: undefined, // Sem pontuação inicial (será decidida no Planning Poker)
-      atrasado: false,
-      comentariosCount: 0,
-      anexosCount: 0
-    };
+    try {
+      // Achar membro atribuído
+      const assignedMember = members.find(m => m.nome === newCardMember);
 
-    onUpdateProject({
-      ...project,
-      cards: [...(project.cards || []), newCard]
-    });
+      const res = await api.post(`/api/projetos/${project.id_projeto}/cards`, {
+        titulo: newCardTitle,
+        prioridade: newCardPriority,
+        tags: newCardTags,
+        id_responsavel: assignedMember?.id_usuario || null,
+      });
 
-    // Resetar formulário
-    setNewCardId('');
-    setNewCardTitle('');
-    setNewCardPriority('MEDIA');
-    setNewCardTags([]);
-    setNewCardMember('');
-    setIsNewCardModalOpen(false);
+      const newCard = res.data;
+
+      onUpdateProject({
+        ...project,
+        cards: [...(project.cards || []), newCard]
+      });
+
+      // Resetar formulário
+      setNewCardTitle('');
+      setNewCardPriority('MEDIA');
+      setNewCardTags([]);
+      setNewCardMember('');
+      setIsNewCardModalOpen(false);
+    } catch (error) {
+      console.error('Erro ao criar atividade:', error);
+    } finally {
+      setCreatingCard(false);
+    }
   };
 
   // Alternar tag nos inputs de nova atividade
@@ -429,7 +445,7 @@ export default function KanbanBoard({ project, onUpdateProject }) {
                                 ${borderAccentColor}
                               `}
                             >
-                              {/* Topo do Card: Badge de Prioridade e ID */}
+                              {/* Topo do Card: Badge de Prioridade */}
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 {col.id === 'CONCLUIDO' ? (
                                   <span className="flex items-center gap-1 font-bold text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
@@ -447,7 +463,6 @@ export default function KanbanBoard({ project, onUpdateProject }) {
                                     {isAlta ? 'ALTA PRIORIDADE' : isMedia ? 'MÉDIA PRIORIDADE' : 'BAIXA PRIORIDADE'}
                                   </span>
                                 )}
-                                <span className="text-[9px] font-bold text-slate-400 font-mono">{card.id_card}</span>
                               </div>
 
                               {/* Título do Card */}
@@ -479,67 +494,26 @@ export default function KanbanBoard({ project, onUpdateProject }) {
 
                               {/* Rodapé do Card */}
                               <div className="flex items-center justify-between">
-                                {/* Avatars dos atribuídos */}
+                                {/* Avatar do responsável */}
                                 <div className="flex -space-x-1.5">
-                                  {(card.membros || []).map((m, idx) => (
+                                  {card.responsavel && (
                                     <img
-                                      key={idx}
-                                      title={m.nome}
-                                      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${m.nome}`}
-                                      alt={m.nome}
+                                      title={card.responsavel.nome}
+                                      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${card.responsavel.nome}`}
+                                      alt={card.responsavel.nome}
                                       className="w-6 h-6 rounded-full border border-white bg-slate-50"
                                     />
-                                  ))}
+                                  )}
                                 </div>
 
                                 {/* Metadados do card */}
                                 <div className="flex items-center gap-2.5 text-[10px] font-bold text-slate-400">
-                                  {card.comentariosCount > 0 && (
-                                    <span className="flex items-center gap-0.5" title="Comentários">
-                                      <MessageSquare size={11} />
-                                      {card.comentariosCount}
-                                    </span>
-                                  )}
-                                  {card.anexosCount > 0 && (
-                                    <span className="flex items-center gap-0.5" title="Anexos">
-                                      <Paperclip size={11} />
-                                      {card.anexosCount}
-                                    </span>
-                                  )}
-                                  {card.pontos !== undefined && (
+                                  {(card.story_points !== undefined && card.story_points !== null) && (
                                     <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-50 border border-slate-100 text-slate-500 font-mono text-[9px]" title="Pontos de História">
-                                      {card.pontos} SP
+                                      {card.story_points} SP
                                     </span>
                                   )}
                                 </div>
-                              </div>
-
-                              {/* Controle de movimentação rápida para telas touch/mobile */}
-                              <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-white shadow-sm rounded border border-slate-100 p-0.5">
-                                {col.id !== 'A_FAZER' && (
-                                  <button
-                                    onClick={() => {
-                                      const prevCol = col.id === 'EM_ANDAMENTO' ? 'A_FAZER' : col.id === 'HOMOLOGACAO' ? 'EM_ANDAMENTO' : 'HOMOLOGACAO';
-                                      moveCard(card.id_card, prevCol);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-brand-600 hover:bg-slate-50 rounded"
-                                    title="Mover para esquerda"
-                                  >
-                                    ←
-                                  </button>
-                                )}
-                                {col.id !== 'CONCLUIDO' && (
-                                  <button
-                                    onClick={() => {
-                                      const nextCol = col.id === 'A_FAZER' ? 'EM_ANDAMENTO' : col.id === 'EM_ANDAMENTO' ? 'HOMOLOGACAO' : 'CONCLUIDO';
-                                      moveCard(card.id_card, nextCol);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-brand-600 hover:bg-slate-50 rounded"
-                                    title="Mover para direita"
-                                  >
-                                    →
-                                  </button>
-                                )}
                               </div>
 
                             </div>
@@ -632,19 +606,6 @@ export default function KanbanBoard({ project, onUpdateProject }) {
             {/* Formulário */}
             <form onSubmit={handleCreateCard} className="space-y-4">
               
-              {/* Código (US ID) */}
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Código (Ex: US10)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="US10"
-                  value={newCardId}
-                  onChange={(e) => setNewCardId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 font-mono"
-                />
-              </div>
-
               {/* Título */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">Título da Atividade</label>
@@ -727,15 +688,17 @@ export default function KanbanBoard({ project, onUpdateProject }) {
                 <button
                   type="button"
                   onClick={() => setIsNewCardModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs transition-colors"
+                  disabled={creatingCard}
+                  className="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-xs transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98]"
+                  disabled={creatingCard}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98] disabled:opacity-50"
                 >
-                  Criar Atividade
+                  {creatingCard ? 'Criando...' : 'Criar Atividade'}
                 </button>
               </div>
 

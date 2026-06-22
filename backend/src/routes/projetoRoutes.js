@@ -2,6 +2,7 @@ import express from "express";
 import { verifyFirebaseToken } from "../middlewares/auth.middleware.js";
 import {
   listarProjetos,
+  listarProjetosDoUsuario,
   obterProjeto,
   criarProjeto,
   atualizarProjeto,
@@ -12,6 +13,7 @@ import {
 const router = express.Router();
 
 router.get("/", verifyFirebaseToken, listarProjetos);
+router.get("/meus", verifyFirebaseToken, listarProjetosDoUsuario);
 router.get("/:id", verifyFirebaseToken, obterProjeto);
 router.post("/", verifyFirebaseToken, criarProjeto);
 router.patch("/:id", verifyFirebaseToken, atualizarProjeto);

@@ -85,6 +85,13 @@ export const criarUsuario = async (req, res) => {
     });
 
     if (usuarioExistente) {
+      if (nome && usuarioExistente.nome !== nome) {
+        const usuarioAtualizado = await prisma.usuario.update({
+          where: { email },
+          data: { nome },
+        });
+        return res.status(200).json(usuarioAtualizado);
+      }
       return res.status(200).json(usuarioExistente);
     }
 
