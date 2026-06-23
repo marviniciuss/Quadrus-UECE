@@ -62,9 +62,12 @@ export default function LoginScreen({ onLoginSuccess }) {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(userCredential.user, { displayName: name });
-            // Reload the user to ensure displayName is reflected in the user object
-            await userCredential.user.reload();
-            onLoginSuccess(userCredential.user);
+            // Desloga o usuário recém-criado para que ele faça login manualmente
+            await auth.signOut();
+            // Redireciona para a tela de login com mensagem de sucesso
+            setPassword('');
+            setViewMode('login');
+            setSuccessMessage('Conta criada com sucesso! Faça login para continuar.');
         } catch (err) {
             console.error('Register error:', err);
             handleAuthError(err);
