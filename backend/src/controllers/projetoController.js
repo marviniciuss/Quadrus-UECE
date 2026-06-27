@@ -31,9 +31,12 @@ export const listarProjetos = async (req, res) => {
 export const listarProjetosDoUsuario = async (req, res) => {
   try {
     const emailUsuario = req.user.email;
+    const { arquivados } = req.query;
+    const isArquivado = arquivados === 'true';
 
     const projetos = await prisma.projeto.findMany({
       where: {
+        arquivado: isArquivado,
         membros: {
           some: {
             usuario: {
@@ -151,15 +154,29 @@ export const criarProjeto = async (req, res) => {
 ========================= */
 export const atualizarProjeto = async (req, res) => {
   const { id } = req.params;
-  const { nome, descricao, data_prazo } = req.body;
+  const { nome, descricao, data_prazo, arquivado } = req.body;
 
   try {
     const projetoExistente = await prisma.projeto.findUnique({
       where: { id_projeto: id },
+      include: {
+        membros: {
+          include: { usuario: true }
+        }
+      }
     });
 
     if (!projetoExistente) {
       return res.status(404).json({ error: "Projeto não encontrado" });
+    }
+
+    const emailUsuario = req.user.email;
+    const isGerente = projetoExistente.membros.some(
+      (membro) => membro.usuario.email === emailUsuario && membro.perfil === 'GERENTE'
+    );
+
+    if (!isGerente) {
+      return res.status(403).json({ error: "Acesso negado: apenas gerentes podem editar as configurações do projeto" });
     }
 
     const projeto = await prisma.projeto.update({
@@ -167,6 +184,7 @@ export const atualizarProjeto = async (req, res) => {
       data: {
         ...(nome !== undefined && { nome }),
         ...(descricao !== undefined && { descricao }),
+        ...(arquivado !== undefined && { arquivado }),
         ...(data_prazo !== undefined && {
           data_prazo: data_prazo ? new Date(data_prazo) : null,
         }),
@@ -189,10 +207,24 @@ export const deletarProjeto = async (req, res) => {
   try {
     const projeto = await prisma.projeto.findUnique({
       where: { id_projeto: id },
+      include: {
+        membros: {
+          include: { usuario: true }
+        }
+      }
     });
 
     if (!projeto) {
       return res.status(404).json({ error: "Projeto não encontrado" });
+    }
+
+    const emailUsuario = req.user.email;
+    const isGerente = projeto.membros.some(
+      (membro) => membro.usuario.email === emailUsuario && membro.perfil === 'GERENTE'
+    );
+
+    if (!isGerente) {
+      return res.status(403).json({ error: "Acesso negado: apenas gerentes podem excluir o projeto" });
     }
 
     await prisma.projeto.delete({

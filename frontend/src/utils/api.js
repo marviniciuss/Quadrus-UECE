@@ -17,9 +17,12 @@ api.interceptors.request.use(
         // Fetch JWT ID token. Automatically refreshes if expired.
         const idToken = await currentUser.getIdToken();
         config.headers.Authorization = `Bearer ${idToken}`;
+        console.log('Firebase ID token anexado à requisição:', config.url);
       } catch (error) {
         console.error('Failed to attach Firebase Auth ID token:', error);
       }
+    } else {
+      console.warn('Nenhum usuário logado no Firebase Auth ao tentar enviar requisição:', config.url);
     }
     return config;
   },

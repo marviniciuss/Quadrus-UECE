@@ -70,9 +70,11 @@ export const buscarUsuarioPorId = async (req, res) => {
  */
 export const criarUsuario = async (req, res) => {
   try {
+    console.log("Recebida requisição para criar/verificar usuário:", req.body);
     const { nome, email } = req.body;
 
     if (!nome || !email) {
+      console.log("Erro: Nome ou email ausente");
       return res.status(400).json({
         error: "Nome e email são obrigatórios",
       });
@@ -85,6 +87,7 @@ export const criarUsuario = async (req, res) => {
     });
 
     if (usuarioExistente) {
+      console.log("Usuário já existe no banco:", usuarioExistente.email);
       if (nome && usuarioExistente.nome !== nome) {
         const usuarioAtualizado = await prisma.usuario.update({
           where: { email },
@@ -95,6 +98,7 @@ export const criarUsuario = async (req, res) => {
       return res.status(200).json(usuarioExistente);
     }
 
+    console.log("Criando novo usuário no Prisma:", email);
     const usuario = await prisma.usuario.create({
       data: {
         nome,
@@ -102,12 +106,14 @@ export const criarUsuario = async (req, res) => {
       },
     });
 
+    console.log("Usuário criado com sucesso:", usuario.id_usuario);
     return res.status(201).json(usuario);
   } catch (error) {
-    console.error(error);
+    console.error("Erro detalhado ao criar usuário no Prisma:", error);
 
     return res.status(500).json({
       error: "Erro ao criar usuário",
+      details: error.message
     });
   }
 };

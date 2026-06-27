@@ -16,10 +16,13 @@ import {
   X,
   UserPlus,
   Sparkles,
-  Menu
+  Menu,
+  Trash2,
+  Archive,
+  Loader2
 } from 'lucide-react';
 
-export default function KanbanBoard({ project, onUpdateProject, userDisplayName }) {
+export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction }) {
   // Estado para controlar a aba ativa no Menu Lateral
   const [activeTab, setActiveTab] = useState('board'); // 'board', 'sprint', 'metrics', 'settings'
 
@@ -45,6 +48,59 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
   const [sprintDropdownOpen, setSprintDropdownOpen] = useState(false);
 
   const sprints = ['Sprint 24 (Atual)', 'Sprint 23', 'Sprint 22'];
+
+  const isManager = (project.membros || []).some(
+    m => m.perfil === 'GERENTE' && m.usuario?.email === currentUserEmail
+  );
+
+  const [editNome, setEditNome] = useState(project.nome || '');
+  const [editDescricao, setEditDescricao] = useState(project.descricao || '');
+  const [editPrazo, setEditPrazo] = useState(project.data_prazo ? project.data_prazo.split('T')[0] : '');
+  const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const handleUpdateSettings = async (e) => {
+    e.preventDefault();
+    if (!isManager) return;
+    setUpdatingSettings(true);
+    try {
+      const res = await api.patch(`/api/projetos/${project.id_projeto}`, {
+        nome: editNome,
+        descricao: editDescricao,
+        data_prazo: editPrazo ? new Date(editPrazo).toISOString() : null,
+      });
+      onUpdateProject(res.data);
+      alert('Configurações salvas com sucesso!');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar as configurações.');
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
+  const handleArchiveProject = async () => {
+    if (!isManager) return;
+    try {
+      await api.patch(`/api/projetos/${project.id_projeto}`, { arquivado: !project.arquivado });
+      if (onProjectAction) onProjectAction();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao alterar status de arquivamento do projeto.');
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!isManager) return;
+    try {
+      await api.delete(`/api/projetos/${project.id_projeto}`);
+      if (onProjectAction) onProjectAction();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir projeto.');
+    }
+  };
 
   // Pegar todos os membros do projeto para exibição e atribuição
   // A API retorna membros com { perfil, usuario: { id_usuario, nome, email } }
@@ -565,16 +621,111 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
           </div>
         ) : (
           /* ================= TELA CONFIGURAÇÕES ================= */
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
-            <Settings className="mx-auto text-brand-600 mb-4 rotate-45 transition-transform" size={40} />
-            <h2 className="text-xl font-extrabold text-slate-800">Configurações do Projeto</h2>
-            <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-              Configure as credenciais do projeto, adicione e remova novos membros da equipe, altere prazos de sprint ou remodele os níveis de cargos e permissões ágeis.
-            </p>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-6 rounded-full text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200">
-              <Sparkles size={12} />
-              Em breve nesta branch!
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm max-w-2xl mx-auto mt-6 text-left">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+              <Settings className="text-brand-600" size={28} />
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-800">Configurações do Projeto</h2>
+                <p className="text-slate-500 text-sm">Gerencie os detalhes básicos, prazos e encerramento do projeto.</p>
+              </div>
             </div>
+
+            {!isManager ? (
+              <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <AlertTriangle size={36} className="text-orange-400 mb-3" />
+                <h3 className="text-lg font-bold text-slate-700">Acesso Restrito</h3>
+                <p className="text-sm text-slate-500 text-center max-w-sm mt-1">Apenas os usuários com perfil de <strong className="text-brand-600">GERENTE</strong> podem visualizar ou alterar as configurações deste projeto.</p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Formulário de Edição */}
+                <form onSubmit={handleUpdateSettings} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Nome do Projeto</label>
+                    <input
+                      type="text"
+                      required
+                      value={editNome}
+                      onChange={(e) => setEditNome(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Descrição</label>
+                    <textarea
+                      required
+                      rows="3"
+                      value={editDescricao}
+                      onChange={(e) => setEditDescricao(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 resize-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Prazo (Deadline)</label>
+                    <input
+                      type="date"
+                      value={editPrazo}
+                      onChange={(e) => setEditPrazo(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-slate-700"
+                    />
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={updatingSettings}
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm transition-all shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {updatingSettings && <Loader2 size={16} className="animate-spin" />}
+                      Salvar Configurações
+                    </button>
+                  </div>
+                </form>
+
+                {/* Área de Perigo (Danger Zone) */}
+                <div className="pt-6 border-t border-slate-200">
+                  <h3 className="text-sm font-bold text-rose-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <AlertTriangle size={16} /> Zona de Perigo
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-orange-200 bg-orange-50/50 flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-bold text-orange-800 text-sm">
+                          {project.arquivado ? 'Desarquivar Projeto' : 'Arquivar Projeto'}
+                        </h4>
+                        <p className="text-xs text-orange-700 mt-1 mb-4 leading-relaxed">
+                          {project.arquivado 
+                            ? 'O projeto voltará a aparecer no seu Dashboard principal e ficará ativo novamente.' 
+                            : 'O projeto não aparecerá mais no Dashboard principal. Todas as tarefas e dados ficarão salvos para consultas futuras.'
+                          }
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsArchiveModalOpen(true)}
+                        className="w-full px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold text-xs rounded-lg transition-colors flex justify-center items-center gap-2"
+                      >
+                        <Archive size={14} /> {project.arquivado ? 'Desarquivar' : 'Arquivar'}
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/50 flex flex-col justify-between">
+                      <div>
+                        <h4 className="font-bold text-rose-800 text-sm">Excluir Definitivamente</h4>
+                        <p className="text-xs text-rose-700 mt-1 mb-4 leading-relaxed">
+                          Isso apagará o projeto permanentemente e todas as tarefas associadas. Essa ação não pode ser desfeita!
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsDeleteModalOpen(true)}
+                        className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors flex justify-center items-center gap-2 shadow-sm"
+                      >
+                        <Trash2 size={14} /> Excluir Projeto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -704,6 +855,69 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName 
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* ================================= MODAL DE ARQUIVAMENTO ================================= */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-scale-up text-center shadow-2xl">
+            <div className="mx-auto w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4">
+              <Archive size={24} />
+            </div>
+            <h3 className="text-lg font-extrabold text-slate-800 mb-2">
+              {project.arquivado ? 'Desarquivar este projeto?' : 'Arquivar este projeto?'}
+            </h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              {project.arquivado 
+                ? <>Tem certeza que deseja desarquivar <strong>{project.nome}</strong>? Ele voltará a aparecer na sua lista de projetos ativos.</>
+                : <>Tem certeza que deseja arquivar <strong>{project.nome}</strong>? Ele deixará de aparecer no dashboard principal, mas seus dados continuarão salvos.</>
+              }
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsArchiveModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleArchiveProject}
+                className="px-5 py-2.5 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 shadow-md active:scale-95 transition-all"
+              >
+                {project.arquivado ? 'Sim, Desarquivar' : 'Sim, Arquivar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================= MODAL DE EXCLUSÃO ================================= */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-scale-up text-center shadow-2xl">
+            <div className="mx-auto w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="text-lg font-extrabold text-slate-800 mb-2">Excluir projeto definitivamente?</h3>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              Você está prestes a excluir <strong>{project.nome}</strong> permanentemente. Todas as tarefas, logs e membros serão removidos. <br/><br/>Esta ação é irreversível. Deseja continuar?
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteProject}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-bold text-sm hover:bg-rose-700 shadow-md active:scale-95 transition-all"
+              >
+                Sim, Excluir Definitivamente
+              </button>
+            </div>
           </div>
         </div>
       )}
