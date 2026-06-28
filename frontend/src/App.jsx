@@ -25,14 +25,15 @@ export default function App() {
   // Lista de projetos carregada do backend
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const dropdownRef = useRef(null);
 
   // Função para buscar projetos do usuário logado no backend
-  const fetchProjects = async () => {
+  const fetchProjects = async (isArchived = false) => {
     setProjectsLoading(true);
     try {
-      const res = await api.get('/api/projetos/meus');
+      const res = await api.get(`/api/projetos/meus?arquivados=${isArchived}`);
       setProjects(res.data);
     } catch (error) {
       console.error('Erro ao buscar projetos:', error);
@@ -97,12 +98,12 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Quando o usuário logar, buscar seus projetos
+  // Quando o usuário logar ou trocar de aba (arquivados/ativos), buscar seus projetos
   useEffect(() => {
     if (currentUser) {
-      fetchProjects();
+      fetchProjects(showArchived);
     }
-  }, [currentUser]);
+  }, [currentUser, showArchived]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -291,13 +292,18 @@ export default function App() {
             onSelectProject={(project) => setSelectedProject(project)}
             onCreateProject={handleCreateProject}
             userDisplayName={userDisplayName}
+            showArchived={showArchived}
+            setShowArchived={setShowArchived}
           />
         ) : (
           /* Novo Quadro Kanban Interativo */
           <KanbanBoard
+            key={selectedProject.id_projeto}
             project={selectedProject}
             onUpdateProject={handleUpdateProject}
+            onProjectAction={() => { setSelectedProject(null); fetchProjects(showArchived); }}
             userDisplayName={userDisplayName}
+            currentUserEmail={currentUser.email}
           />
         )}
       </main>

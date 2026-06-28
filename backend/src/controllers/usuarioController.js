@@ -104,7 +104,7 @@ export const criarUsuario = async (req, res) => {
 
     return res.status(201).json(usuario);
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao criar usuário:", error);
 
     return res.status(500).json({
       error: "Erro ao criar usuário",
@@ -203,5 +203,39 @@ export const deletarUsuario = async (req, res) => {
     return res.status(500).json({
       error: "Erro ao remover usuário",
     });
+  }
+};
+
+/**
+ * Buscar usuários por nome (busca server-side com paginação)
+ */
+export const buscarUsuarios = async (req, res) => {
+  try {
+    const { q = '', limit = 20 } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(200).json([]);
+    }
+
+    const usuarios = await prisma.usuario.findMany({
+      where: {
+        nome: {
+          contains: q.trim(),
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id_usuario: true,
+        nome: true,
+        email: true,
+      },
+      take: Math.min(parseInt(limit) || 20, 50),
+      orderBy: { nome: 'asc' },
+    });
+
+    return res.status(200).json(usuarios);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao buscar usuários" });
   }
 };

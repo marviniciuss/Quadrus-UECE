@@ -70,6 +70,7 @@ model Projeto {
   membros       MembroProjeto[]
   sprints       Sprint[]
   cards         Card[]
+  arquivado     Boolean          @default(false)
   
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt

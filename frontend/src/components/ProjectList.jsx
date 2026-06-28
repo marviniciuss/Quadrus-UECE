@@ -12,7 +12,7 @@ import {
     Loader2
 } from 'lucide-react';
 
-export default function ProjectList({ projects, projectsLoading, onSelectProject, onCreateProject, userDisplayName }) {
+export default function ProjectList({ projects, projectsLoading, onSelectProject, onCreateProject, userDisplayName, showArchived, setShowArchived }) {
     const [searchTerm, setSearchTerm] = useState('');
 
     // Estados para controlar o formulário do Novo Projeto
@@ -77,16 +77,33 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
     return (
         <div className="w-full max-w-4xl mx-auto px-4 py-6 relative">
 
-            {/* Barra de Busca */}
-            <div className="relative mb-6 text-left">
-                <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                <input
-                    type="text"
-                    placeholder="Pesquisar projeto..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 shadow-sm"
-                />
+            {/* Barra de Busca e Filtros */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
+                <div className="relative flex-1 text-left w-full">
+                    <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Pesquisar projeto..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 shadow-sm"
+                    />
+                </div>
+                
+                <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm shrink-0 w-full sm:w-auto">
+                    <button
+                        onClick={() => setShowArchived(false)}
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${!showArchived ? 'bg-brand-50 text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Projetos Ativos
+                    </button>
+                    <button
+                        onClick={() => setShowArchived(true)}
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${showArchived ? 'bg-brand-50 text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        Arquivados
+                    </button>
+                </div>
             </div>
 
             {/* Lista de Projetos */}
