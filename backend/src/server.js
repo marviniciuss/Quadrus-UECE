@@ -8,6 +8,7 @@ import { verifyFirebaseToken } from './middlewares/auth.middleware.js';
 import projetoRoutes from "./routes/projetoRoutes.js";
 import usuarioRoutes from "./routes/usuarioRoutes.js";
 import cardRoutes from "./routes/cardRoutes.js";
+import sprintRoutes from "./routes/sprintRoutes.js";
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.get('/api/protected', verifyFirebaseToken, (req, res) => {
 app.use("/api/projetos", projetoRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api", cardRoutes);
+app.use("/api", sprintRoutes);
 
 // Socket.io setup
 const io = new Server(httpServer, {
