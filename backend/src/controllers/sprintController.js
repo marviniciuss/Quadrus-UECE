@@ -1,8 +1,11 @@
 import prisma from "../lib/prisma.js";
+import { obterMembroProjeto } from "../utils/projetoAuth.js";
+
+const STATUS_SPRINT_VALIDOS = ["PLANEJAMENTO", "ATIVA", "CONCLUIDA"];
 
 /* =========================
    CRIAR SPRINT EM UM PROJETO
-========================= */
+ ========================= */
 export const criarSprint = async (req, res) => {
   const { id } = req.params; // id do projeto
   const { nome, data_inicio, data_fim } = req.body;
@@ -26,12 +29,29 @@ export const criarSprint = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto
+    const membro = await obterMembroProjeto(id, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Validação de datas
+    if (data_inicio && data_fim) {
+      if (new Date(data_fim) < new Date(data_inicio)) {
+        return res.status(400).json({
+          error: "A data de fim não pode ser anterior à data de início",
+        });
+      }
+    }
+
     const sprint = await prisma.sprint.create({
       data: {
         id_projeto: id,
         nome,
-        data_inicio: data_inicio || null,
-        data_fim: data_fim || null,
+        data_inicio: data_inicio ? new Date(data_inicio) : null,
+        data_fim: data_fim ? new Date(data_fim) : null,
       },
     });
 
@@ -46,7 +66,7 @@ export const criarSprint = async (req, res) => {
 
 /* =========================
    LISTAR SPRINTS DE UM PROJETO
-========================= */
+ ========================= */
 export const listarSprints = async (req, res) => {
   const { id } = req.params;
 
@@ -60,6 +80,14 @@ export const listarSprints = async (req, res) => {
     if (!projeto) {
       return res.status(404).json({
         error: "Projeto não encontrado",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto
+    const membro = await obterMembroProjeto(id, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
       });
     }
 
@@ -86,7 +114,7 @@ export const listarSprints = async (req, res) => {
 
 /* =========================
    BUSCAR SPRINT
-========================= */
+ ========================= */
 export const buscarSprint = async (req, res) => {
   const { id } = req.params;
 
@@ -111,6 +139,14 @@ export const buscarSprint = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto da sprint
+    const membro = await obterMembroProjeto(sprint.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
     return res.json(sprint);
   } catch (error) {
     console.error(error);
@@ -122,7 +158,7 @@ export const buscarSprint = async (req, res) => {
 
 /* =========================
    ATUALIZAR SPRINT
-========================= */
+ ========================= */
 export const atualizarSprint = async (req, res) => {
   const { id } = req.params;
   const { nome, data_inicio, data_fim, status } = req.body;
@@ -140,15 +176,41 @@ export const atualizarSprint = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto da sprint
+    const membro = await obterMembroProjeto(sprint.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Validação de Status Enum
+    if (status && !STATUS_SPRINT_VALIDOS.includes(status)) {
+      return res.status(400).json({
+        error: `Status inválido. Use: ${STATUS_SPRINT_VALIDOS.join(", ")}`,
+      });
+    }
+
+    // Validação de datas
+    const finalDataInicio = data_inicio !== undefined ? data_inicio : sprint.data_inicio;
+    const finalDataFim = data_fim !== undefined ? data_fim : sprint.data_fim;
+    if (finalDataInicio && finalDataFim) {
+      if (new Date(finalDataFim) < new Date(finalDataInicio)) {
+        return res.status(400).json({
+          error: "A data de fim não pode ser anterior à data de início",
+        });
+      }
+    }
+
     const sprintAtualizada = await prisma.sprint.update({
       where: {
         id_sprint: id,
       },
       data: {
-        nome,
-        data_inicio,
-        data_fim,
-        status,
+        ...(nome !== undefined && { nome }),
+        ...(data_inicio !== undefined && { data_inicio: data_inicio ? new Date(data_inicio) : null }),
+        ...(data_fim !== undefined && { data_fim: data_fim ? new Date(data_fim) : null }),
+        ...(status !== undefined && { status }),
       },
     });
 
@@ -163,7 +225,7 @@ export const atualizarSprint = async (req, res) => {
 
 /* =========================
    EXCLUIR SPRINT
-========================= */
+ ========================= */
 export const excluirSprint = async (req, res) => {
   const { id } = req.params;
 
@@ -177,6 +239,14 @@ export const excluirSprint = async (req, res) => {
     if (!sprint) {
       return res.status(404).json({
         error: "Sprint não encontrada",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto da sprint
+    const membro = await obterMembroProjeto(sprint.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
       });
     }
 
@@ -199,7 +269,7 @@ export const excluirSprint = async (req, res) => {
 
 /* =========================
    INICIAR SPRINT
-========================= */
+ ========================= */
 export const iniciarSprint = async (req, res) => {
   const { id } = req.params;
 
@@ -213,6 +283,35 @@ export const iniciarSprint = async (req, res) => {
     if (!sprint) {
       return res.status(404).json({
         error: "Sprint não encontrada",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto da sprint
+    const membro = await obterMembroProjeto(sprint.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Regra de Negócio: Não reabrir sprints concluídas
+    if (sprint.status === "CONCLUIDA") {
+      return res.status(400).json({
+        error: "Não é possível iniciar uma sprint que já foi concluída",
+      });
+    }
+
+    // Regra de Negócio: Impedir múltiplas sprints ativas no mesmo projeto
+    const sprintAtivaExistente = await prisma.sprint.findFirst({
+      where: {
+        id_projeto: sprint.id_projeto,
+        status: "ATIVA",
+      },
+    });
+
+    if (sprintAtivaExistente) {
+      return res.status(400).json({
+        error: "Já existe uma sprint ativa para este projeto. Conclua-a antes de iniciar uma nova",
       });
     }
 
@@ -237,7 +336,7 @@ export const iniciarSprint = async (req, res) => {
 
 /* =========================
    FINALIZAR SPRINT
-========================= */
+ ========================= */
 export const finalizarSprint = async (req, res) => {
   const { id } = req.params;
 
@@ -251,6 +350,21 @@ export const finalizarSprint = async (req, res) => {
     if (!sprint) {
       return res.status(404).json({
         error: "Sprint não encontrada",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto da sprint
+    const membro = await obterMembroProjeto(sprint.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Regra de Negócio: Apenas sprints ATIVAS podem ser finalizadas
+    if (sprint.status !== "ATIVA") {
+      return res.status(400).json({
+        error: "Apenas sprints ativas podem ser finalizadas",
       });
     }
 

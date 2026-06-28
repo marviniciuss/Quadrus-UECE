@@ -1,8 +1,11 @@
 import prisma from "../lib/prisma.js";
+import { obterMembroProjeto } from "../utils/projetoAuth.js";
+
+const PRIORIDADES_VALIDAS = ["BAIXA", "MEDIA", "ALTA"];
 
 /* =========================
    CRIAR CARD EM UM PROJETO
-========================= */
+ ========================= */
 export const criarCard = async (req, res) => {
   const { id } = req.params; // id do projeto
   const {
@@ -12,6 +15,7 @@ export const criarCard = async (req, res) => {
     tags,
     id_responsavel,
     id_sprint,
+    story_points,
   } = req.body;
 
   try {
@@ -31,6 +35,51 @@ export const criarCard = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto
+    const membro = await obterMembroProjeto(id, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Validação: Prioridade
+    if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
+      return res.status(400).json({
+        error: `Prioridade inválida. Use: ${PRIORIDADES_VALIDAS.join(", ")}`,
+      });
+    }
+
+    // Validação: id_responsavel deve ser membro do projeto
+    if (id_responsavel) {
+      const membroResponsavel = await prisma.membroProjeto.findFirst({
+        where: {
+          id_projeto: id,
+          id_usuario: id_responsavel,
+        },
+      });
+      if (!membroResponsavel) {
+        return res.status(400).json({
+          error: "O responsável atribuído não é membro deste projeto",
+        });
+      }
+    }
+
+    // Validação: id_sprint deve pertencer ao mesmo projeto
+    if (id_sprint) {
+      const sprint = await prisma.sprint.findFirst({
+        where: {
+          id_sprint,
+          id_projeto: id,
+        },
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          error: "A sprint informada não pertence a este projeto",
+        });
+      }
+    }
+
     const card = await prisma.card.create({
       data: {
         id_projeto: id,
@@ -41,6 +90,7 @@ export const criarCard = async (req, res) => {
         tags: tags || [],
         id_responsavel: id_responsavel || null,
         id_sprint: id_sprint || null,
+        story_points: story_points ? parseInt(story_points) : null,
       },
       include: {
         responsavel: true,
@@ -70,6 +120,14 @@ export const listarCards = async (req, res) => {
     if (!projeto) {
       return res.status(404).json({
         error: "Projeto não encontrado",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto
+    const membro = await obterMembroProjeto(id, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
       });
     }
 
@@ -120,6 +178,14 @@ export const buscarCard = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
     return res.json(card);
   } catch (error) {
     console.error(error);
@@ -156,17 +222,62 @@ export const atualizarCard = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Validação: Prioridade
+    if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
+      return res.status(400).json({
+        error: `Prioridade inválida. Use: ${PRIORIDADES_VALIDAS.join(", ")}`,
+      });
+    }
+
+    // Validação: id_responsavel deve ser membro do projeto do card
+    if (id_responsavel) {
+      const membroResponsavel = await prisma.membroProjeto.findFirst({
+        where: {
+          id_projeto: card.id_projeto,
+          id_usuario: id_responsavel,
+        },
+      });
+      if (!membroResponsavel) {
+        return res.status(400).json({
+          error: "O responsável atribuído não é membro deste projeto",
+        });
+      }
+    }
+
+    // Validação: id_sprint deve pertencer ao mesmo projeto do card
+    if (id_sprint) {
+      const sprint = await prisma.sprint.findFirst({
+        where: {
+          id_sprint,
+          id_projeto: card.id_projeto,
+        },
+      });
+      if (!sprint) {
+        return res.status(400).json({
+          error: "A sprint informada não pertence a este projeto",
+        });
+      }
+    }
+
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
-        titulo,
-        descricao,
-        prioridade,
-        tags,
-        id_responsavel,
-        id_sprint,
-        story_points,
-        em_risco,
+        ...(titulo !== undefined && { titulo }),
+        ...(descricao !== undefined && { descricao }),
+        ...(prioridade !== undefined && { prioridade }),
+        ...(tags !== undefined && { tags }),
+        ...(id_responsavel !== undefined && { id_responsavel }),
+        ...(id_sprint !== undefined && { id_sprint }),
+        ...(story_points !== undefined && { story_points: story_points ? parseInt(story_points) : null }),
+        ...(em_risco !== undefined && { em_risco }),
       },
       include: {
         responsavel: true,
@@ -200,6 +311,14 @@ export const excluirCard = async (req, res) => {
       });
     }
 
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
     await prisma.card.update({
       where: { id_card: id },
       data: {
@@ -220,7 +339,7 @@ export const excluirCard = async (req, res) => {
 
 /* =========================
    ATUALIZAR STATUS (KANBAN)
-========================= */
+ ========================= */
 export const atualizarStatusCard = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -246,6 +365,14 @@ export const atualizarStatusCard = async (req, res) => {
     if (!card) {
       return res.status(404).json({
         error: "Card não encontrado",
+      });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
       });
     }
 
