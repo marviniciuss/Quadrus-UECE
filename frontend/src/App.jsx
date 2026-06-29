@@ -21,6 +21,8 @@ export default function App() {
   const [socketStatus, setSocketStatus] = useState('offline');
   const [selectedProject, setSelectedProject] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // Lista de projetos carregada do backend
   const [projects, setProjects] = useState([]);
@@ -28,6 +30,8 @@ export default function App() {
   const [showArchived, setShowArchived] = useState(false);
 
   const dropdownRef = useRef(null);
+  const helpRef = useRef(null);
+  const notificationsRef = useRef(null);
 
   // Função para buscar projetos do usuário logado no backend
   const fetchProjects = async (isArchived = false) => {
@@ -109,6 +113,12 @@ export default function App() {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
+      }
+      if (helpRef.current && !helpRef.current.contains(event.target)) {
+        setHelpOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -244,22 +254,60 @@ export default function App() {
 
         {/* Lado Direito: Notificações, Dúvidas, Perfil e Sair */}
         <div className="flex items-center gap-4">
-          <button
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-            title="Dúvidas / Ajuda"
-            onClick={() => alert("Central de Ajuda")}
-          >
-            <HelpCircle size={20} />
-          </button>
+          {/* Central de Ajuda Dropdown */}
+          <div className="relative" ref={helpRef}>
+            <button
+              className={`p-2 rounded-lg transition-colors ${helpOpen ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+              title="Dúvidas / Ajuda"
+              onClick={() => setHelpOpen(!helpOpen)}
+            >
+              <HelpCircle size={20} />
+            </button>
+            {helpOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-2.5 z-50 animate-fade-in text-left">
+                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-2">
+                  Central de Ajuda
+                </div>
+                <div className="px-4 py-2 space-y-2 text-xs text-slate-600">
+                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Como planejar sprints?</div>
+                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Atribuir atividades a membros</div>
+                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Mudar status de cards no Kanban</div>
+                  <div className="pt-2 border-t border-slate-100 text-center font-bold text-brand-600 hover:text-brand-700 cursor-pointer">
+                    Ver documentação completa
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <button
-            className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-            title="Notificações"
-            onClick={() => alert("Nenhuma notificação nova")}
-          >
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-          </button>
+          {/* Central de Notificações Dropdown */}
+          <div className="relative" ref={notificationsRef}>
+            <button
+              className={`relative p-2 rounded-lg transition-colors ${notificationsOpen ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+              title="Notificações"
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+            >
+              <Bell size={20} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-2.5 z-50 animate-fade-in text-left">
+                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-2">
+                  Notificações
+                </div>
+                <div className="max-h-60 overflow-y-auto px-4 py-1 space-y-3">
+                  <div className="text-xs pb-2 border-b border-slate-100 last:border-b-0">
+                    <p className="font-bold text-slate-700">Bem-vindo ao Quadrus! 🎉</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5">Agora mesmo</p>
+                  </div>
+                  <div className="text-xs pb-2 border-b border-slate-100 last:border-b-0">
+                    <p className="font-semibold text-slate-600">Dica: Inicie novas sprints na aba de Planejamento.</p>
+                    <p className="text-slate-400 text-[10px] mt-0.5">5 min atrás</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
             <img
