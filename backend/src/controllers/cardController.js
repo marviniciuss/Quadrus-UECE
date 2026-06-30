@@ -397,6 +397,51 @@ export const atualizarStatusCard = async (req, res) => {
       io.to(card.id_projeto).emit('card_moved', cardAtualizado);
     }
 
+    // US05.02: Notificar Testers quando card é movido para HOMOLOGACAO
+    if (status === "HOMOLOGACAO") {
+      try {
+        // Buscar todos os membros TESTER do projeto
+        const testers = await prisma.membroProjeto.findMany({
+          where: {
+            id_projeto: card.id_projeto,
+            perfil: "TESTER",
+          },
+          include: { usuario: true },
+        });
+
+        // Criar notificações no banco para cada tester
+        const mensagem = `O card "${cardAtualizado.titulo}" foi movido para Homologação e está pronto para testes.`;
+
+        for (const tester of testers) {
+          const notificacao = await prisma.notificacao.create({
+            data: {
+              id_usuario_destino: tester.id_usuario,
+              id_card_origem: card.id_card,
+              mensagem,
+            },
+            include: {
+              card: {
+                select: {
+                  id_card: true,
+                  titulo: true,
+                  status: true,
+                  id_projeto: true,
+                },
+              },
+            },
+          });
+
+          // Emitir notificação em tempo real via Socket.io
+          if (io) {
+            io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+          }
+        }
+      } catch (notifError) {
+        // Não falhar a movimentação do card se a notificação falhar
+        console.error("Erro ao criar notificações para testers:", notifError);
+      }
+    }
+
     return res.json(cardAtualizado);
   } catch (error) {
     console.error(error);

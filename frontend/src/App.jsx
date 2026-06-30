@@ -3,7 +3,8 @@ import {
   Bell,
   HelpCircle,
   ChevronDown,
-  LogOut
+  LogOut,
+  CheckCheck
 } from 'lucide-react';
 import axios from 'axios';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -23,6 +24,14 @@ export default function App() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Estado do usuário no banco de dados (para ID de notificações)
+  const [dbUser, setDbUser] = useState(null);
+  const dbUserRef = useRef(null);
+
+  // Notificações
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Lista de projetos carregada do backend
   const [projects, setProjects] = useState([]);
@@ -69,7 +78,9 @@ export default function App() {
     try {
       const nome = user.displayName || user.email.split('@')[0];
       const email = user.email;
-      await api.post('/api/usuarios', { nome, email });
+      const res = await api.post('/api/usuarios', { nome, email });
+      setDbUser(res.data);
+      dbUserRef.current = res.data;
       console.log('Usuário sincronizado após login/cadastro com nome:', nome);
     } catch (error) {
       console.error('Erro ao sincronizar após login/cadastro:', error);
@@ -90,7 +101,9 @@ export default function App() {
         try {
           const nome = user.displayName || user.email.split('@')[0];
           const email = user.email;
-          await api.post('/api/usuarios', { nome, email });
+          const res = await api.post('/api/usuarios', { nome, email });
+          setDbUser(res.data);
+          dbUserRef.current = res.data;
           console.log('Usuário sincronizado com o banco de dados PostgreSQL.');
         } catch (error) {
           console.error('Erro ao sincronizar usuário com o backend:', error);
@@ -102,12 +115,73 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // Buscar notificações do usuário
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get('/api/notificacoes');
+      setNotifications(res.data);
+      setUnreadCount(res.data.filter(n => !n.lida).length);
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+    }
+  };
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      await api.patch(`/api/notificacoes/${id}/ler`);
+      setNotifications(prev => prev.map(n => n.id_notificacao === id ? { ...n, lida: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Erro ao marcar notificação como lida:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.post('/api/notificacoes/ler-todas');
+      setNotifications(prev => prev.map(n => ({ ...n, lida: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Erro ao marcar todas como lidas:', error);
+    }
+  };
+
+  const formatTimeAgo = (dateStr) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = now - d;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Agora mesmo';
+    if (mins < 60) return `${mins} min atrás`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h atrás`;
+    const days = Math.floor(hours / 24);
+    return `${days}d atrás`;
+  };
+
   // Quando o usuário logar ou trocar de aba (arquivados/ativos), buscar seus projetos
   useEffect(() => {
     if (currentUser) {
       fetchProjects(showArchived);
+      fetchNotifications();
     }
   }, [currentUser, showArchived]);
+
+  // Escutar notificações em tempo real via Socket
+  useEffect(() => {
+    const handleNewNotification = (notif) => {
+      const user = dbUserRef.current;
+      if (user && notif.id_usuario_destino === user.id_usuario) {
+        setNotifications(prev => [notif, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      }
+    };
+
+    socket.on('nova_notificacao', handleNewNotification);
+    return () => {
+      socket.off('nova_notificacao', handleNewNotification);
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -288,22 +362,48 @@ export default function App() {
               onClick={() => setNotificationsOpen(!notificationsOpen)}
             >
               <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-2.5 z-50 animate-fade-in text-left">
-                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-2">
-                  Notificações
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg py-2.5 z-50 animate-fade-in text-left">
+                <div className="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notificações</span>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      className="flex items-center gap-1 text-[10px] font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+                    >
+                      <CheckCheck size={12} />
+                      Marcar todas como lidas
+                    </button>
+                  )}
                 </div>
-                <div className="max-h-60 overflow-y-auto px-4 py-1 space-y-3">
-                  <div className="text-xs pb-2 border-b border-slate-100 last:border-b-0">
-                    <p className="font-bold text-slate-700">Bem-vindo ao Quadrus! 🎉</p>
-                    <p className="text-slate-400 text-[10px] mt-0.5">Agora mesmo</p>
-                  </div>
-                  <div className="text-xs pb-2 border-b border-slate-100 last:border-b-0">
-                    <p className="font-semibold text-slate-600">Dica: Inicie novas sprints na aba de Planejamento.</p>
-                    <p className="text-slate-400 text-[10px] mt-0.5">5 min atrás</p>
-                  </div>
+                <div className="max-h-72 overflow-y-auto px-2 py-1 space-y-1">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-400">
+                      <Bell size={24} className="mx-auto mb-2 opacity-30" />
+                      Nenhuma notificação por aqui.
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id_notificacao}
+                        onClick={() => !n.lida && handleMarkAsRead(n.id_notificacao)}
+                        className={`text-xs px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                          n.lida
+                            ? 'text-slate-400 hover:bg-slate-50'
+                            : 'text-slate-700 bg-brand-50/50 hover:bg-brand-50 font-semibold'
+                        }`}
+                      >
+                        <p className="leading-relaxed">{n.mensagem}</p>
+                        <p className="text-slate-400 text-[10px] mt-1 font-normal">{formatTimeAgo(n.createdAt)}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
