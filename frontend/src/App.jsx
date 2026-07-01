@@ -14,6 +14,7 @@ import { socket } from './utils/socket.js';
 import ProjectList from './components/ProjectList.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import KanbanBoard from './components/KanbanBoard.jsx';
+import ProfileModal from './components/ProfileModal.jsx';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -24,6 +25,7 @@ export default function App() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Estado do usuário no banco de dados (para ID de notificações)
   const [dbUser, setDbUser] = useState(null);
@@ -203,6 +205,24 @@ export default function App() {
     socket.on('nova_notificacao', handleNewNotification);
     return () => {
       socket.off('nova_notificacao', handleNewNotification);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleUsuarioAtualizado = (data) => {
+      const currentUserInDb = dbUserRef.current;
+      if (currentUserInDb && data.id_usuario === currentUserInDb.id_usuario) {
+        setDbUser(prev => {
+          const updated = { ...prev, nome: data.nome, foto: data.foto };
+          dbUserRef.current = updated;
+          return updated;
+        });
+      }
+    };
+
+    socket.on('usuario_atualizado', handleUsuarioAtualizado);
+    return () => {
+      socket.off('usuario_atualizado', handleUsuarioAtualizado);
     };
   }, []);
 
@@ -450,16 +470,20 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+          <button
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-2 pl-2 border-l border-slate-200 hover:opacity-80 transition-opacity focus:outline-none"
+            title="Configurações do Perfil"
+          >
             <img
-              src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${userDisplayName}`}
+              src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(dbUser?.foto || dbUser?.nome || userDisplayName)}`}
               alt="Avatar do Usuário"
               className="w-8 h-8 rounded-full border border-slate-200 bg-slate-100 object-cover"
             />
             <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight">
-              {userDisplayName}
+              {dbUser?.nome || userDisplayName}
             </span>
-          </div>
+          </button>
 
           <button
             onClick={handleLogout}
@@ -513,6 +537,16 @@ export default function App() {
           </div>
         </footer>
       )}
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={dbUser}
+        onSave={(updatedUser) => {
+          setDbUser(updatedUser);
+          dbUserRef.current = updatedUser;
+        }}
+      />
     </div>
   );
 }

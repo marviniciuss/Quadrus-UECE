@@ -7,12 +7,14 @@ import {
   atualizarUsuario,
   deletarUsuario,
   buscarUsuarios,
+  atualizarPerfil,
 } from "../controllers/usuarioController.js";
 
 const router = express.Router();
 
 router.get("/", verifyFirebaseToken, listarUsuarios);
 router.get("/buscar", verifyFirebaseToken, buscarUsuarios);
+router.put("/perfil", verifyFirebaseToken, atualizarPerfil);
 router.get("/:id", verifyFirebaseToken, buscarUsuarioPorId);
 router.post("/", verifyFirebaseToken, criarUsuario);
 router.patch("/:id", verifyFirebaseToken, atualizarUsuario);

@@ -48,11 +48,13 @@ function Toast({ message, type, onClose }) {
 }
 
 // Helper para gerar iniciais de fallback para avatares
-function AvatarWithFallback({ nome, className = '' }) {
+function AvatarWithFallback({ nome, foto, className = '', title }) {
   const initials = (nome || 'U').split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  const seed = foto || nome;
   return (
     <img
-      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(nome)}`}
+      title={title || nome}
+      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(seed)}`}
       alt={nome}
       className={`${className} bg-white`}
       onError={(e) => {
@@ -93,11 +95,63 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       });
     };
 
+    const handleUsuarioAtualizado = (data) => {
+      const currentProject = projectRef.current;
+      if (!currentProject) return;
+
+      // Update members list
+      const updatedMembros = (currentProject.membros || []).map(m => {
+        const uId = m.usuario?.id_usuario || m.id_usuario;
+        if (uId === data.id_usuario) {
+          if (m.usuario) {
+            return {
+              ...m,
+              usuario: {
+                ...m.usuario,
+                nome: data.nome,
+                foto: data.foto
+              }
+            };
+          } else {
+            return {
+              ...m,
+              nome: data.nome,
+              foto: data.foto
+            };
+          }
+        }
+        return m;
+      });
+
+      // Update cards responsavel
+      const updatedCards = (currentProject.cards || []).map(c => {
+        if (c.responsavel?.id_usuario === data.id_usuario) {
+          return {
+            ...c,
+            responsavel: {
+              ...c.responsavel,
+              nome: data.nome,
+              foto: data.foto
+            }
+          };
+        }
+        return c;
+      });
+
+      onUpdateProject({
+        ...currentProject,
+        membros: updatedMembros,
+        cards: updatedCards
+      });
+    };
+
     socket.on('card_moved', handleCardMoved);
+    socket.on('usuario_atualizado', handleUsuarioAtualizado);
 
     return () => {
       leaveProjectRoom(project.id_projeto);
       socket.off('card_moved', handleCardMoved);
+      socket.off('usuario_atualizado', handleUsuarioAtualizado);
     };
   }, [project.id_projeto, onUpdateProject]);
 
@@ -357,6 +411,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     nome: m.usuario?.nome || m.nome || 'Membro',
     email: m.usuario?.email || '',
     perfil: m.perfil || 'DEV',
+    foto: m.usuario?.foto || m.foto || null,
   }));
 
   // Categorias de colunas (Status)
@@ -770,12 +825,12 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 <div className="flex items-center">
                   <div className="flex -space-x-2.5">
                     {members.slice(0, 4).map((member, i) => (
-                      <img
+                      <AvatarWithFallback
                         key={member.id_usuario || i}
+                        nome={member.nome}
+                        foto={member.foto}
                         title={`${member.nome} (${member.perfil})`}
-                        src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${member.nome}`}
-                        alt={member.nome}
-                        className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 object-cover shadow-sm"
+                        className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm"
                       />
                     ))}
                     {members.length > 4 && (
@@ -994,10 +1049,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                 {/* Avatar do responsável */}
                                 <div className="flex -space-x-1.5">
                                   {card.responsavel && (
-                                    <img
+                                    <AvatarWithFallback
+                                      nome={card.responsavel.nome}
+                                      foto={card.responsavel.foto}
                                       title={card.responsavel.nome}
-                                      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${card.responsavel.nome}`}
-                                      alt={card.responsavel.nome}
                                       className="w-6 h-6 rounded-full border border-white bg-slate-50"
                                     />
                                   )}
@@ -1403,7 +1458,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                       {members.map((m) => (
                         <li key={m.id_usuario} className="p-3 flex items-center justify-between hover:bg-slate-100 transition-colors">
                           <div className="flex items-center gap-3">
-                            <AvatarWithFallback nome={m.nome} className="w-8 h-8 rounded-full border border-slate-300" />
+                            <AvatarWithFallback nome={m.nome} foto={m.foto} className="w-8 h-8 rounded-full border border-slate-300" />
                             <div className="flex flex-col">
                               <span className="text-sm font-bold text-slate-800">{m.nome}</span>
                               <span className="text-xs text-slate-500">{m.email || 'Email não disponível'}</span>

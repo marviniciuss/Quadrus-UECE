@@ -239,3 +239,57 @@ export const buscarUsuarios = async (req, res) => {
     return res.status(500).json({ error: "Erro ao buscar usuários" });
   }
 };
+
+/**
+ * Atualizar perfil do próprio usuário autenticado
+ */
+export const atualizarPerfil = async (req, res) => {
+  try {
+    const email = req.user.email;
+    const { nome, foto } = req.body;
+
+    if (!nome) {
+      return res.status(400).json({
+        error: "Nome é obrigatório",
+      });
+    }
+
+    const usuarioAtualizado = await prisma.usuario.update({
+      where: {
+        email,
+      },
+      data: {
+        nome,
+        foto,
+      },
+    });
+
+    // Enviar atualizações em tempo real via Socket.io para todas as salas de projetos em que ele participa
+    const io = req.app.get("io");
+    if (io) {
+      const membros = await prisma.membroProjeto.findMany({
+        where: {
+          id_usuario: usuarioAtualizado.id_usuario,
+        },
+        select: {
+          id_projeto: true,
+        },
+      });
+
+      membros.forEach((m) => {
+        io.to(m.id_projeto).emit("usuario_atualizado", {
+          id_usuario: usuarioAtualizado.id_usuario,
+          nome: usuarioAtualizado.nome,
+          foto: usuarioAtualizado.foto,
+        });
+      });
+    }
+
+    return res.status(200).json(usuarioAtualizado);
+  } catch (error) {
+    console.error("Erro ao atualizar perfil do usuário:", error);
+    return res.status(500).json({
+      error: "Erro ao atualizar perfil",
+    });
+  }
+};

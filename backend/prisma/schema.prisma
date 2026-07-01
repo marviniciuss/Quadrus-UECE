@@ -50,6 +50,7 @@ model Usuario {
   id_usuario    String           @id @default(uuid()) @db.Uuid
   nome          String
   email         String           @unique
+  foto          String?
   membros       MembroProjeto[]
   cards         Card[]           @relation("ResponsavelCards")
   votos         VotoPoker[]
