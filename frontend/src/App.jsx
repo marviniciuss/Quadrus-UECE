@@ -70,6 +70,22 @@ export default function App() {
     }
   };
 
+  // Função para buscar os detalhes completos do projeto (incluindo colunas e etiquetas) ao selecioná-lo
+  const handleSelectProject = async (proj) => {
+    if (!proj) {
+      setSelectedProject(null);
+      return;
+    }
+    // Define o projeto parcial imediatamente para transição instantânea
+    setSelectedProject(proj);
+    try {
+      const res = await api.get(`/api/projetos/${proj.id_projeto}`);
+      setSelectedProject(res.data);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes completos do projeto:', error);
+    }
+  };
+
   // Função para atualizar dados de um projeto existente no estado local
   const handleUpdateProject = (updatedProject) => {
     setProjects(prev => prev.map(p => p.id_projeto === updatedProject.id_projeto ? updatedProject : p));
@@ -312,7 +328,7 @@ export default function App() {
 
           <nav className="flex items-center gap-4 border-l border-slate-200 pl-6">
             <span
-              onClick={() => setSelectedProject(null)}
+              onClick={() => handleSelectProject(null)}
               className="font-bold text-sm text-slate-800 cursor-pointer hover:text-brand-600 transition-colors"
             >
               Projetos
@@ -335,7 +351,7 @@ export default function App() {
                   <div className="max-h-64 overflow-y-auto">
                     <button
                       onClick={() => {
-                        setSelectedProject(null);
+                        handleSelectProject(null);
                         setDropdownOpen(false);
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs font-bold text-brand-600 hover:bg-brand-50 transition-colors"
@@ -346,7 +362,7 @@ export default function App() {
                       <button
                         key={project.id_projeto}
                         onClick={() => {
-                          setSelectedProject(project);
+                          handleSelectProject(project);
                           setDropdownOpen(false);
                         }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 transition-colors flex flex-col ${selectedProject?.id_projeto === project.id_projeto ? 'bg-brand-50/40 border-l-2 border-brand-500' : ''
@@ -502,7 +518,7 @@ export default function App() {
           <ProjectList
             projects={projects}
             projectsLoading={projectsLoading}
-            onSelectProject={(project) => setSelectedProject(project)}
+            onSelectProject={handleSelectProject}
             onCreateProject={handleCreateProject}
             userDisplayName={userDisplayName}
             showArchived={showArchived}
@@ -514,7 +530,7 @@ export default function App() {
             key={selectedProject.id_projeto}
             project={selectedProject}
             onUpdateProject={handleUpdateProject}
-            onProjectAction={() => { setSelectedProject(null); fetchProjects(showArchived); }}
+            onProjectAction={() => { handleSelectProject(null); fetchProjects(showArchived); }}
             userDisplayName={userDisplayName}
             currentUserEmail={currentUser.email}
           />

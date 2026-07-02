@@ -21,7 +21,10 @@ import {
   Trash2,
   Archive,
   Loader2,
-  ChevronsRight
+  ChevronsRight,
+  Sliders,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 // Componente de Toast para notificações inline
@@ -216,6 +219,65 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePerfil, setInvitePerfil] = useState('DEV');
   const [invitingMember, setInvitingMember] = useState(false);
+
+  // --- Customização de Board e Etiquetas ---
+  const PRESET_COLORS = [
+    "#EF4444", // Vermelho
+    "#F59E0B", // Laranja
+    "#10B981", // Verde
+    "#3B82F6", // Azul
+    "#6366F1", // ÍNDIGO
+    "#8B5CF6", // Roxo
+    "#EC4899", // Rosa
+    "#64748B", // Cinza
+    "#7C3AED"  // Violeta
+  ];
+
+  const presetColors = {
+    "#EF4444": { bg: "#FEE2E2", text: "#991B1B", border: "#FCA5A5" },
+    "#F59E0B": { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
+    "#10B981": { bg: "#D1FAE5", text: "#065F46", border: "#6EE7B7" },
+    "#3B82F6": { bg: "#DBEAFE", text: "#1E40AF", border: "#93C5FD" },
+    "#6366F1": { bg: "#E0E7FF", text: "#3730A3", border: "#A5B4FC" },
+    "#8B5CF6": { bg: "#F3E8FF", text: "#5B21B6", border: "#C084FC" },
+    "#EC4899": { bg: "#FCE7F3", text: "#9D174D", border: "#F9A8D4" },
+    "#64748B": { bg: "#F1F5F9", text: "#334155", border: "#CBD5E1" },
+    "#7C3AED": { bg: "#EDE9FE", text: "#5B21B6", border: "#C4B5FD" }
+  };
+
+  const getColors = (hex) => {
+    return presetColors[hex] || { bg: "#F1F5F9", text: "#334155", border: "#CBD5E1" };
+  };
+
+  const [newCardEtiquetas, setNewCardEtiquetas] = useState([]);
+  const [isBoardConfigModalOpen, setIsBoardConfigModalOpen] = useState(false);
+  const [boardConfigTab, setBoardConfigTab] = useState('columns'); // 'columns' | 'tags'
+
+  // Colunas states
+  const [newColName, setNewColName] = useState('');
+  const [newColColor, setNewColColor] = useState('#64748B');
+  const [editingColId, setEditingColId] = useState(null);
+  const [editingColName, setEditingColName] = useState('');
+  const [editingColColor, setEditingColColor] = useState('');
+
+  // Estados para criação e gerenciamento inline de colunas
+  const [isCreatingColumnInline, setIsCreatingColumnInline] = useState(false);
+  const [inlineColumnName, setInlineColumnName] = useState('');
+  const [activeColumnMenu, setActiveColumnMenu] = useState(null);
+  const [editingColumnHeaderId, setEditingColumnHeaderId] = useState(null);
+  const [editingColumnHeaderName, setEditingColumnHeaderName] = useState('');
+
+  // Etiquetas states
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3B82F6');
+  const [editingTagId, setEditingTagId] = useState(null);
+  const [editingTagName, setEditingTagName] = useState('');
+  const [editingTagColor, setEditingTagColor] = useState('');
+
+  // Estados de filtros estruturados
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState('');
+  const [selectedPriorityFilter, setSelectedPriorityFilter] = useState('');
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
 
   // Estados do autocomplete de usuários (busca server-side)
   const [searchResults, setSearchResults] = useState([]);
@@ -415,12 +477,24 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   }));
 
   // Categorias de colunas (Status)
-  const columns = [
-    { id: 'A_FAZER', label: 'A FAZER', color: 'bg-slate-200 text-slate-700' },
-    { id: 'EM_ANDAMENTO', label: 'EM ANDAMENTO', color: 'bg-amber-100 text-amber-800' },
-    { id: 'HOMOLOGACAO', label: 'HOMOLOGAÇÃO', color: 'bg-purple-100 text-purple-800' },
-    { id: 'CONCLUIDO', label: 'CONCLUÍDO', color: 'bg-emerald-100 text-emerald-800' },
-  ];
+  const columns = (project.colunas && project.colunas.length > 0)
+    ? project.colunas.map(col => {
+      const colColors = getColors(col.cor);
+      return {
+        id: col.id_coluna,
+        label: col.nome,
+        colorHex: col.cor,
+        bg: colColors.bg,
+        text: colColors.text,
+        border: colColors.border,
+      };
+    })
+    : [
+      { id: 'A_FAZER', label: 'A FAZER', colorHex: '#64748B', bg: '#f1f5f9', text: '#334155', border: '#cbd5e1' },
+      { id: 'EM_ANDAMENTO', label: 'EM ANDAMENTO', colorHex: '#F59E0B', bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
+      { id: 'HOMOLOGACAO', label: 'HOMOLOGAÇÃO', colorHex: '#8B5CF6', bg: '#f3e8ff', text: '#5b21b6', border: '#c084fc' },
+      { id: 'CONCLUIDO', label: 'CONCLUÍDO', colorHex: '#10B981', bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+    ];
 
   // ================= DRAG AND DROP NATIVO =================
   const handleDragStart = (e, cardId) => {
@@ -442,7 +516,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     if (!cardId) return;
 
     const cardObj = (project.cards || []).find(c => c.id_card === cardId);
-    if (!cardObj || cardObj.status === targetStatus) return;
+    if (!cardObj || cardObj.id_coluna === targetStatus) return;
 
     // Auto-atribuição otimista: se o card não tem responsável, atribui ao usuário que moveu
     let optimisticResponsavel = cardObj.responsavel;
@@ -463,12 +537,22 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     // Salvar estado anterior para rollback
     const previousCards = project.cards;
 
+    // Encontrar status legado correspondente
+    const targetColObj = (project.colunas || []).find(c => c.id_coluna === targetStatus);
+    let legacyStatus = "A_FAZER";
+    if (targetColObj) {
+      if (targetColObj.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
+      else if (targetColObj.nome === "HOMOLOGAÇÃO") legacyStatus = "HOMOLOGACAO";
+      else if (targetColObj.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
+    }
+
     // Atualização otimista
     const updatedCards = project.cards.map(card => {
       if (card.id_card === cardId) {
         return {
           ...card,
-          status: targetStatus,
+          id_coluna: targetStatus,
+          status: legacyStatus,
           id_responsavel: optimisticResponsavelId,
           responsavel: optimisticResponsavel,
         };
@@ -482,7 +566,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     });
 
     // Persistir no backend
-    api.patch(`/api/cards/${cardId}/status`, { status: targetStatus })
+    api.patch(`/api/cards/${cardId}/status`, { id_coluna: targetStatus })
       .then(res => {
         // Sincronizar com a resposta do servidor (inclui auto-atribuição confirmada)
         const serverCards = project.cards.map(card =>
@@ -507,7 +591,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Mover cartão via clique (acessibilidade / mobile-friendly)
   const moveCard = (cardId, targetStatus) => {
     const cardObj = (project.cards || []).find(c => c.id_card === cardId);
-    if (!cardObj || cardObj.status === targetStatus) return;
+    if (!cardObj || cardObj.id_coluna === targetStatus) return;
 
     // Auto-atribuição otimista
     let optimisticResponsavel = cardObj.responsavel;
@@ -527,11 +611,20 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
 
     const previousCards = project.cards;
 
+    const targetColObj = (project.colunas || []).find(c => c.id_coluna === targetStatus);
+    let legacyStatus = "A_FAZER";
+    if (targetColObj) {
+      if (targetColObj.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
+      else if (targetColObj.nome === "HOMOLOGAÇÃO") legacyStatus = "HOMOLOGACAO";
+      else if (targetColObj.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
+    }
+
     const updatedCards = project.cards.map(card => {
       if (card.id_card === cardId) {
         return {
           ...card,
-          status: targetStatus,
+          id_coluna: targetStatus,
+          status: legacyStatus,
           id_responsavel: optimisticResponsavelId,
           responsavel: optimisticResponsavel,
         };
@@ -545,7 +638,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     });
 
     // Persistir no backend
-    api.patch(`/api/cards/${cardId}/status`, { status: targetStatus })
+    api.patch(`/api/cards/${cardId}/status`, { id_coluna: targetStatus })
       .then(res => {
         const serverCards = project.cards.map(card =>
           card.id_card === cardId ? res.data : card
@@ -569,11 +662,30 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const filteredCards = (project.cards || []).filter(card => {
     const matchesSearch = card.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       card.id_card.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = selectedTag ? (card.tags || []).includes(selectedTag) : true;
+
+    const matchesTag = selectedTag
+      ? (
+        (card.etiquetas || []).some(e => e.nome === selectedTag) ||
+        (card.tags || []).includes(selectedTag)
+      )
+      : true;
+
     const matchesSprint = selectedSprintId === 'backlog'
       ? (!card.id_sprint)
       : (card.id_sprint === selectedSprintId);
-    return matchesSearch && matchesTag && matchesSprint;
+
+    const matchesMember = !selectedMemberFilter
+      ? true
+      : (selectedMemberFilter === 'unassigned'
+        ? (!card.id_responsavel && !card.responsavel)
+        : (String(card.id_responsavel || card.responsavel?.id_usuario) === String(selectedMemberFilter))
+      );
+
+    const matchesPriority = !selectedPriorityFilter
+      ? true
+      : (card.prioridade === selectedPriorityFilter);
+
+    return matchesSearch && matchesTag && matchesSprint && matchesMember && matchesPriority;
   });
 
   // ================= SUBMISSÃO DE NOVA ATIVIDADE =================
@@ -590,9 +702,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       const res = await api.post(`/api/projetos/${project.id_projeto}/cards`, {
         titulo: newCardTitle,
         prioridade: newCardPriority,
-        tags: newCardTags,
         id_responsavel: assignedMember?.id_usuario || null,
         id_sprint: selectedSprintId === 'backlog' ? null : selectedSprintId,
+        id_etiquetas: newCardEtiquetas,
       });
 
       const newCard = res.data;
@@ -606,6 +718,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       setNewCardTitle('');
       setNewCardPriority('MEDIA');
       setNewCardTags([]);
+      setNewCardEtiquetas([]);
       setNewCardMember('');
       setIsNewCardModalOpen(false);
 
@@ -624,6 +737,250 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       setNewCardTags(newCardTags.filter(t => t !== tag));
     } else {
       setNewCardTags([...newCardTags, tag]);
+    }
+  };
+
+  // Alternar etiqueta nos inputs de nova atividade
+  const toggleFormEtiqueta = (idEtiqueta) => {
+    if (newCardEtiquetas.includes(idEtiqueta)) {
+      setNewCardEtiquetas(newCardEtiquetas.filter(id => id !== idEtiqueta));
+    } else {
+      setNewCardEtiquetas([...newCardEtiquetas, idEtiqueta]);
+    }
+  };
+
+  // ================= GERENCIAMENTO DE COLUNAS =================
+  const handleCreateColumn = async (e) => {
+    e.preventDefault();
+    if (!newColName.trim()) return;
+
+    try {
+      // Garantir colunas padrão carregadas caso não existam no estado do projeto
+      const currentCols = (project.colunas && project.colunas.length > 0)
+        ? project.colunas
+        : [
+          { id_coluna: 'A_FAZER', nome: 'A FAZER', cor: '#64748B' },
+          { id_coluna: 'EM_ANDAMENTO', nome: 'EM ANDAMENTO', cor: '#F59E0B' },
+          { id_coluna: 'HOMOLOGACAO', nome: 'HOMOLOGAÇÃO', cor: '#8B5CF6' },
+          { id_coluna: 'CONCLUIDO', nome: 'CONCLUÍDO', cor: '#10B981' },
+        ];
+
+      const res = await api.post(`/api/projetos/${project.id_projeto}/colunas`, {
+        nome: newColName.trim().toUpperCase(),
+        cor: newColColor
+      });
+
+      onUpdateProject({
+        ...project,
+        colunas: [...currentCols, res.data]
+      });
+
+      setNewColName('');
+      showToast('Coluna criada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao criar coluna:', error);
+      showToast(error.response?.data?.error || 'Erro ao criar coluna.', 'error');
+    }
+  };
+
+  const handleCreateColumnInline = async (name) => {
+    if (!name.trim()) return;
+    try {
+      const currentCols = (project.colunas && project.colunas.length > 0)
+        ? project.colunas
+        : [
+          { id_coluna: 'A_FAZER', nome: 'A FAZER', cor: '#64748B' },
+          { id_coluna: 'EM_ANDAMENTO', nome: 'EM ANDAMENTO', cor: '#F59E0B' },
+          { id_coluna: 'HOMOLOGACAO', nome: 'HOMOLOGAÇÃO', cor: '#8B5CF6' },
+          { id_coluna: 'CONCLUIDO', nome: 'CONCLUÍDO', cor: '#10B981' },
+        ];
+
+      const res = await api.post(`/api/projetos/${project.id_projeto}/colunas`, {
+        nome: name.trim().toUpperCase(),
+        cor: '#64748B' // Default Slate color
+      });
+
+      onUpdateProject({
+        ...project,
+        colunas: [...currentCols, res.data]
+      });
+
+      setIsCreatingColumnInline(false);
+      setInlineColumnName('');
+      showToast('Coluna criada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao criar coluna inline:', error);
+      showToast(error.response?.data?.error || 'Erro ao criar coluna.', 'error');
+    }
+  };
+
+  const handleRenameColumnHeader = async (id, newName, cor) => {
+    if (!newName.trim()) return;
+    try {
+      const currentCols = (project.colunas && project.colunas.length > 0)
+        ? project.colunas
+        : [
+          { id_coluna: 'A_FAZER', nome: 'A FAZER', cor: '#64748B' },
+          { id_coluna: 'EM_ANDAMENTO', nome: 'EM ANDAMENTO', cor: '#F59E0B' },
+          { id_coluna: 'HOMOLOGACAO', nome: 'HOMOLOGAÇÃO', cor: '#8B5CF6' },
+          { id_coluna: 'CONCLUIDO', nome: 'CONCLUÍDO', cor: '#10B981' },
+        ];
+
+      const res = await api.put(`/api/colunas/${id}`, {
+        nome: newName.trim().toUpperCase(),
+        cor: cor || '#64748B'
+      });
+
+      onUpdateProject({
+        ...project,
+        colunas: currentCols.map(c => c.id_coluna === id ? res.data : c)
+      });
+
+      setEditingColumnHeaderId(null);
+      showToast('Coluna renomeada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao renomear coluna:', error);
+      showToast(error.response?.data?.error || 'Erro ao renomear coluna.', 'error');
+    }
+  };
+
+  const handleUpdateColumn = async (id) => {
+    if (!editingColName.trim()) return;
+    try {
+      const currentCols = (project.colunas && project.colunas.length > 0)
+        ? project.colunas
+        : [
+          { id_coluna: 'A_FAZER', nome: 'A FAZER', cor: '#64748B' },
+          { id_coluna: 'EM_ANDAMENTO', nome: 'EM ANDAMENTO', cor: '#F59E0B' },
+          { id_coluna: 'HOMOLOGACAO', nome: 'HOMOLOGAÇÃO', cor: '#8B5CF6' },
+          { id_coluna: 'CONCLUIDO', nome: 'CONCLUÍDO', cor: '#10B981' },
+        ];
+
+      const res = await api.put(`/api/colunas/${id}`, {
+        nome: editingColName.trim().toUpperCase(),
+        cor: editingColColor
+      });
+
+      onUpdateProject({
+        ...project,
+        colunas: currentCols.map(c => c.id_coluna === id ? res.data : c)
+      });
+
+      setEditingColId(null);
+      showToast('Coluna atualizada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao atualizar coluna:', error);
+      showToast(error.response?.data?.error || 'Erro ao atualizar coluna.', 'error');
+    }
+  };
+
+  const handleMoveColumn = async (colId, direction) => {
+    const cols = [...(project.colunas || [])];
+    const index = cols.findIndex(c => c.id_coluna === colId);
+    if (index === -1) return;
+
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= cols.length) return;
+
+    // Swap
+    const temp = cols[index];
+    cols[index] = cols[targetIndex];
+    cols[targetIndex] = temp;
+
+    // Atualização otimista do estado
+    onUpdateProject({
+      ...project,
+      colunas: cols
+    });
+
+    try {
+      await api.put(`/api/projetos/${project.id_projeto}/colunas/reordenar`, {
+        idsColunas: cols.map(c => c.id_coluna)
+      });
+    } catch (error) {
+      console.error('Erro ao reordenar colunas:', error);
+      showToast('Erro ao salvar nova ordem das colunas.', 'error');
+    }
+  };
+
+  const handleDeleteColumn = async (colId) => {
+    try {
+      await api.delete(`/api/colunas/${colId}`);
+      onUpdateProject({
+        ...project,
+        colunas: (project.colunas || []).filter(c => c.id_coluna !== colId)
+      });
+      showToast('Coluna excluída com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir coluna:', error);
+      showToast(error.response?.data?.error || 'Erro ao excluir coluna.', 'error');
+    }
+  };
+
+  // ================= GERENCIAMENTO DE ETIQUETAS =================
+  const handleCreateTag = async (e) => {
+    e.preventDefault();
+    if (!newTagName.trim()) return;
+
+    try {
+      const res = await api.post(`/api/projetos/${project.id_projeto}/etiquetas`, {
+        nome: newTagName.trim().toUpperCase(),
+        cor: newTagColor
+      });
+
+      onUpdateProject({
+        ...project,
+        etiquetas: [...(project.etiquetas || []), res.data]
+      });
+
+      setNewTagName('');
+      showToast('Etiqueta criada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao criar etiqueta:', error);
+      showToast(error.response?.data?.error || 'Erro ao criar etiqueta.', 'error');
+    }
+  };
+
+  const handleUpdateTag = async (id) => {
+    if (!editingTagName.trim()) return;
+    try {
+      const res = await api.put(`/api/etiquetas/${id}`, {
+        nome: editingTagName.trim().toUpperCase(),
+        cor: editingTagColor
+      });
+
+      onUpdateProject({
+        ...project,
+        etiquetas: (project.etiquetas || []).map(et => et.id_etiqueta === id ? res.data : et),
+        cards: (project.cards || []).map(card => ({
+          ...card,
+          etiquetas: (card.etiquetas || []).map(et => et.id_etiqueta === id ? res.data : et)
+        }))
+      });
+
+      setEditingTagId(null);
+      showToast('Etiqueta atualizada com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao atualizar etiqueta:', error);
+      showToast(error.response?.data?.error || 'Erro ao atualizar etiqueta.', 'error');
+    }
+  };
+
+  const handleDeleteTag = async (id) => {
+    try {
+      await api.delete(`/api/etiquetas/${id}`);
+      onUpdateProject({
+        ...project,
+        etiquetas: (project.etiquetas || []).filter(et => et.id_etiqueta !== id),
+        cards: (project.cards || []).map(card => ({
+          ...card,
+          etiquetas: (card.etiquetas || []).filter(et => et.id_etiqueta !== id)
+        }))
+      });
+      showToast('Etiqueta excluída com sucesso!', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir etiqueta:', error);
+      showToast('Erro ao excluir etiqueta.', 'error');
     }
   };
 
@@ -713,6 +1070,15 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     }
   };
 
+  const colunasList = (project.colunas && project.colunas.length > 0)
+    ? project.colunas
+    : [
+      { id_coluna: 'A_FAZER', nome: 'A FAZER', cor: '#64748B' },
+      { id_coluna: 'EM_ANDAMENTO', nome: 'EM ANDAMENTO', cor: '#F59E0B' },
+      { id_coluna: 'HOMOLOGACAO', nome: 'HOMOLOGAÇÃO', cor: '#8B5CF6' },
+      { id_coluna: 'CONCLUIDO', nome: 'CONCLUÍDO', cor: '#10B981' },
+    ];
+
   return (
     <div className="flex flex-col md:flex-row flex-grow md:h-full md:overflow-hidden -mx-6 md:-mx-8 relative">
 
@@ -750,8 +1116,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <button
               onClick={() => { setActiveTab('board'); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'board'
-                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
             >
               <FolderKanban size={18} />
@@ -761,8 +1127,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <button
               onClick={() => { setActiveTab('sprint'); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'sprint'
-                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
             >
               <Calendar size={18} />
@@ -772,8 +1138,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <button
               onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
-                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
             >
               <TrendingUp size={18} />
@@ -783,8 +1149,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'settings'
-                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                 }`}
             >
               <Settings size={18} />
@@ -811,158 +1177,305 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       )}
 
       {/* ================= 2. CONTEÚDO PRINCIPAL DA TELA ================= */}
-      <main className="flex-1 p-6 md:p-8 flex flex-col bg-slate-50 overflow-y-auto h-full overflow-x-auto min-h-0 text-left">
+      <main className="flex-1 p-6 md:p-8 flex flex-col bg-slate-50 overflow-y-hidden h-full overflow-x-auto min-h-0 text-left">
 
         {activeTab === 'board' ? (
           <>
             {/* ================= BARRA DE FERRAMENTAS / TOOLBAR ================= */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="bg-white border border-slate-200 rounded-2xl py-4.5 px-6 shadow-sm mb-6 flex flex-row items-center gap-4 w-full min-h-[80px]">
 
-              {/* Esquerda: Membros e Filtros Rápidos */}
-              <div className="flex flex-wrap items-center gap-4">
-
-                {/* Lista de Membros do Projeto */}
-                <div className="flex items-center">
-                  <div className="flex -space-x-2.5">
-                    {members.slice(0, 4).map((member, i) => (
-                      <AvatarWithFallback
-                        key={member.id_usuario || i}
-                        nome={member.nome}
-                        foto={member.foto}
-                        title={`${member.nome} (${member.perfil})`}
-                        className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm"
-                      />
-                    ))}
-                    {members.length > 4 && (
-                      <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-extrabold text-slate-600 shadow-sm shrink-0">
-                        +{members.length - 4}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (canInvite) {
-                        setIsInviteModalOpen(true);
-                      } else {
-                        alert('Acesso negado: apenas gerentes e POs podem convidar membros.');
-                      }
-                    }}
-                    className="ml-3 p-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-brand-600 hover:border-brand-500 transition-colors"
-                    title="Adicionar Membro"
-                  >
-                    <UserPlus size={15} />
-                  </button>
+              {/* Lista de Membros do Projeto */}
+              <div className="flex items-center shrink-0">
+                <div className="flex -space-x-2.5">
+                  {members.slice(0, 4).map((member, i) => (
+                    <AvatarWithFallback
+                      key={member.id_usuario || i}
+                      nome={member.nome}
+                      foto={member.foto}
+                      title={`${member.nome} (${member.perfil})`}
+                      className="w-9 h-9 rounded-full border-2 border-white object-cover shadow-sm"
+                    />
+                  ))}
+                  {members.length > 4 && (
+                    <div className="w-9 h-9 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-xs font-extrabold text-slate-600 shadow-sm shrink-0">
+                      +{members.length - 4}
+                    </div>
+                  )}
                 </div>
+                <button
+                  onClick={() => {
+                    if (canInvite) {
+                      setIsInviteModalOpen(true);
+                    } else {
+                      alert('Acesso negado: apenas gerentes e POs podem convidar membros.');
+                    }
+                  }}
+                  className="ml-3 p-2 rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-[#320066] hover:border-brand-500 transition-colors"
+                  title="Adicionar Membro"
+                >
+                  <UserPlus size={16} />
+                </button>
+              </div>
 
-                <div className="h-6 w-px bg-slate-200 hidden md:block" />
+              <div className="h-8 w-px bg-slate-200 shrink-0" />
 
-                {/* Filtros de Tags */}
-                <div className="flex items-center gap-1.5">
-                  {['FRONTEND', 'DESIGN', 'BACKEND', 'DEVOPS'].map(tag => (
+              {/* Filtros de Tags com Scroll Horizontal e Botão de Gerenciamento */}
+              <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+                {(project.etiquetas && project.etiquetas.length > 0) ? (
+                  project.etiquetas.map(et => {
+                    const colors = getColors(et.cor);
+                    const isSelected = selectedTag === et.nome;
+                    return (
+                      <button
+                        key={et.id_etiqueta}
+                        onClick={() => setSelectedTag(selectedTag === et.nome ? '' : et.nome)}
+                        className="px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shadow-sm shrink-0"
+                        style={{
+                          backgroundColor: isSelected ? et.cor : colors.bg,
+                          color: isSelected ? '#ffffff' : colors.text,
+                          borderColor: isSelected ? et.cor : colors.border
+                        }}
+                      >
+                        {et.nome}
+                      </button>
+                    );
+                  })
+                ) : (
+                  ['FRONTEND', 'DESIGN', 'BACKEND', 'DEVOPS'].map(tag => (
                     <button
                       key={tag}
                       onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
-                      className={`px-3 py-1.5 rounded-lg font-semibold text-[10px] border transition-all active:scale-95 ${selectedTag === tag
-                          ? 'bg-brand-600 border-brand-600 text-white shadow-sm'
-                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                      className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shrink-0 ${selectedTag === tag
+                        ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                         }`}
                     >
                       {tag}
                     </button>
-                  ))}
-                </div>
+                  ))
+                )}
 
-                {/* Dropdown de Sprint */}
-                <div className="relative">
+                {/* Botão de Adicionar/Gerenciar Etiquetas ao fim da lista */}
+                {(isPO || isManager) && (
                   <button
-                    onClick={() => setSprintDropdownOpen(!sprintDropdownOpen)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-900 hover:bg-brand-850 text-white font-bold text-[11px] border border-brand-800 transition-all active:scale-95 uppercase tracking-wide shadow-sm"
+                    onClick={() => {
+                      setBoardConfigTab('tags');
+                      setIsBoardConfigModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-dashed border-slate-300 text-slate-400 hover:text-[#320066] hover:border-brand-500 transition-colors flex items-center gap-1.5 shrink-0 bg-white text-xs font-bold"
+                    title="Nova Etiqueta"
                   >
-                    <span>{selectedSprintId === 'backlog' ? 'BACKLOG' : (sprints.find(s => s.id_sprint === selectedSprintId)?.nome || 'SELECIONAR SPRINT')}</span>
-                    <ChevronDown size={12} className={`transition-transform duration-200 ${sprintDropdownOpen ? 'rotate-180' : ''}`} />
+                    <Plus size={13} />
+                    <span>Nova Etiqueta</span>
                   </button>
-
-                  {sprintDropdownOpen && (
-                    <div className="absolute left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-left animate-fade-in">
-                      <button
-                        onClick={() => {
-                          setSelectedSprintId('backlog');
-                          setSprintDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === 'backlog' ? 'text-brand-600 bg-brand-50/50' : 'text-slate-700'
-                          }`}
-                      >
-                        BACKLOG
-                      </button>
-                      {sprints.map((sprint) => (
-                        <button
-                          key={sprint.id_sprint}
-                          onClick={() => {
-                            setSelectedSprintId(sprint.id_sprint);
-                            setSprintDropdownOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === sprint.id_sprint ? 'text-brand-600 bg-brand-50/50' : 'text-slate-700'
-                            }`}
-                        >
-                          {sprint.nome} {sprint.status === 'ATIVA' && ' (Atual)'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
+                )}
               </div>
 
-              {/* Direita: Campo de Pesquisa e Filtros */}
-              <div className="flex items-center gap-2 w-full lg:w-auto">
-                <div className="relative flex-1 lg:w-64">
-                  <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Pesquisar tarefas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
-                  />
-                </div>
+              <div className="h-8 w-px bg-slate-200 shrink-0" />
+
+              {/* Dropdown de Sprint */}
+              <div className="relative shrink-0 w-36 sm:w-44">
+                <button
+                  onClick={() => setSprintDropdownOpen(!sprintDropdownOpen)}
+                  className="flex items-center justify-between w-full gap-2 px-4 py-2.5 rounded-xl bg-[#320066] hover:bg-[#26004d] text-white font-bold text-xs border border-[#26004d] transition-all active:scale-95 uppercase tracking-wide shadow-sm"
+                >
+                  <span className="truncate">{selectedSprintId === 'backlog' ? 'BACKLOG' : (sprints.find(s => s.id_sprint === selectedSprintId)?.nome || 'SELECIONAR SPRINT')}</span>
+                  <ChevronDown size={12} className={`transition-transform duration-200 shrink-0 ${sprintDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {sprintDropdownOpen && (
+                  <div className="absolute right-0 lg:left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-left animate-fade-in">
+                    <button
+                      onClick={() => {
+                        setSelectedSprintId('backlog');
+                        setSprintDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === 'backlog' ? 'text-[#320066] bg-brand-50/50' : 'text-slate-700'
+                        }`}
+                    >
+                      BACKLOG
+                    </button>
+                    {sprints.map((sprint) => (
+                      <button
+                        key={sprint.id_sprint}
+                        onClick={() => {
+                          setSelectedSprintId(sprint.id_sprint);
+                          setSprintDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === sprint.id_sprint ? 'text-[#320066] bg-brand-50/50' : 'text-slate-700'
+                          }`}
+                      >
+                        {sprint.nome} {sprint.status === 'ATIVA' && ' (Atual)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="h-8 w-px bg-slate-200 shrink-0" />
+
+              {/* Campo de Pesquisa */}
+              <div className="relative shrink-0 w-36 sm:w-48">
+                <Search className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+                <input
+                  type="text"
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                />
+              </div>
+
+              {/* Filtros e customização */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => { setSelectedTag(''); setSearchTerm(''); }}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                  className="p-2.5 text-slate-400 hover:text-slate-650 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
                   title="Limpar Filtros"
                 >
                   <Filter size={16} />
                 </button>
+                {(isPO || isManager) && (
+                  <button
+                    onClick={() => setIsBoardConfigModalOpen(true)}
+                    className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                    title="Customizar Quadro (Colunas e Etiquetas)"
+                  >
+                    <Sliders size={16} />
+                  </button>
+                )}
               </div>
 
             </div>
 
             {/* ================= QUADRO KANBAN ================= */}
-            <div className="flex gap-5 min-h-[500px] items-stretch select-none pb-6 overflow-x-auto">
+            <div className="flex-1 flex gap-5 items-stretch select-none pb-6 overflow-x-auto min-h-0">
 
               {/* Loop pelas colunas do Kanban */}
               {columns.map(col => {
-                const columnCards = filteredCards.filter(card => card.status === col.id);
+                const columnCards = filteredCards.filter(card => {
+                  if (card.id_coluna) return card.id_coluna === col.id;
+
+                  let mappedStatus = col.id;
+                  if (col.label === "A FAZER") mappedStatus = "A_FAZER";
+                  else if (col.label === "EM ANDAMENTO") mappedStatus = "EM_ANDAMENTO";
+                  else if (col.label === "HOMOLOGAÇÃO") mappedStatus = "HOMOLOGACAO";
+                  else if (col.label === "CONCLUÍDO") mappedStatus = "CONCLUIDO";
+
+                  return card.status === mappedStatus;
+                });
 
                 return (
                   <div
                     key={col.id}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-72 p-4 shrink-0 shadow-sm"
+                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-72 p-4 shrink-0 shadow-sm h-full min-h-0"
                   >
                     {/* Header da Coluna */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm text-slate-800 tracking-tight">{col.label}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                    <div className="flex items-center justify-between mb-4 relative">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: col.colorHex || '#64748B' }}
+                        />
+                        {editingColumnHeaderId === col.id ? (
+                          <input
+                            type="text"
+                            autoFocus
+                            value={editingColumnHeaderName}
+                            onChange={(e) => setEditingColumnHeaderName(e.target.value)}
+                            onBlur={() => handleRenameColumnHeader(col.id, editingColumnHeaderName, col.colorHex)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleRenameColumnHeader(col.id, editingColumnHeaderName, col.colorHex);
+                              if (e.key === 'Escape') setEditingColumnHeaderId(null);
+                            }}
+                            className="bg-white border border-slate-350 rounded px-1.5 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-brand-500 w-full"
+                          />
+                        ) : (
+                          <span
+                            className="font-extrabold text-sm text-slate-800 tracking-tight cursor-pointer hover:text-[#320066] truncate"
+                            onDoubleClick={() => {
+                              if (isPO || isManager) {
+                                setEditingColumnHeaderId(col.id);
+                                setEditingColumnHeaderName(col.label);
+                              }
+                            }}
+                            title="Clique duas vezes para renomear"
+                          >
+                            {col.label}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 shrink-0">
                           {columnCards.length}
                         </span>
                       </div>
-                      <span className="text-slate-400 text-sm font-bold cursor-pointer hover:text-slate-600">•••</span>
+
+                      {/* Botão de Opções da Coluna */}
+                      {(isPO || isManager) && (
+                        <div className="relative shrink-0">
+                          <button
+                            onClick={() => setActiveColumnMenu(activeColumnMenu === col.id ? null : col.id)}
+                            className="text-slate-400 text-sm font-bold cursor-pointer hover:text-slate-650 px-1 py-0.5 rounded hover:bg-slate-200 transition-colors"
+                          >
+                            •••
+                          </button>
+
+                          {/* Menu Dropdown de Ações da Coluna */}
+                          {activeColumnMenu === col.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setActiveColumnMenu(null)}
+                              />
+                              <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-250 rounded-xl shadow-lg py-1.5 z-20 text-left animate-fade-in text-slate-700">
+                                <button
+                                  onClick={() => {
+                                    setEditingColumnHeaderId(col.id);
+                                    setEditingColumnHeaderName(col.label);
+                                    setActiveColumnMenu(null);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                >
+                                  Renomear
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleMoveColumn(col.id, 'left');
+                                    setActiveColumnMenu(null);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                >
+                                  Mover Esquerda
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleMoveColumn(col.id, 'right');
+                                    setActiveColumnMenu(null);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2"
+                                >
+                                  Mover Direita
+                                </button>
+                                <div className="border-t border-slate-100 my-1" />
+                                <button
+                                  onClick={() => {
+                                    handleDeleteColumn(col.id);
+                                    setActiveColumnMenu(null);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 text-xs font-bold hover:bg-slate-50 hover:text-rose-600 text-rose-500 transition-colors flex items-center gap-2"
+                                >
+                                  Excluir Coluna
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Botão Nova Atividade na coluna A_FAZER */}
-                    {col.id === 'A_FAZER' && (
+                    {/* Botão Nova Atividade na primeira coluna */}
+                    {col.id === columns[0]?.id && (
                       <button
                         onClick={() => setIsNewCardModalOpen(true)}
                         className="mb-4 w-full flex items-center justify-center gap-2 bg-[#320066] hover:bg-[#26004d] text-white font-extrabold text-xs py-3 rounded-xl transition-all shadow-md shadow-brand-500/10 active:scale-[0.98]"
@@ -973,19 +1486,12 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     )}
 
                     {/* Área de rolagem dos cartões na coluna */}
-                    <div className="space-y-3 flex-1 min-h-[300px] overflow-y-auto max-h-[600px] pr-1">
+                    <div className="space-y-3 flex-1 overflow-y-auto pr-1 min-h-0 no-scrollbar">
                       {columnCards.length > 0 ? (
                         columnCards.map(card => {
                           const isAlta = card.prioridade === 'ALTA';
                           const isMedia = card.prioridade === 'MEDIA';
                           const isBaixa = card.prioridade === 'BAIXA';
-
-                          // Cor do accent da esquerda dependendo do status e prioridade
-                          let borderAccentColor = 'border-l-4 border-l-slate-400';
-                          if (col.id === 'CONCLUIDO') borderAccentColor = 'border-l-4 border-l-emerald-500';
-                          else if (isAlta) borderAccentColor = 'border-l-4 border-l-rose-500';
-                          else if (isMedia) borderAccentColor = 'border-l-4 border-l-indigo-500';
-                          else if (isBaixa) borderAccentColor = 'border-l-4 border-l-slate-400';
 
                           return (
                             <div
@@ -993,10 +1499,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               draggable
                               onDragStart={(e) => handleDragStart(e, card.id_card)}
                               onDragEnd={handleDragEnd}
-                              className={`
-                                group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-grab active:cursor-grabbing transition-all duration-200 relative
-                                ${borderAccentColor}
-                              `}
+                              className="group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-grab active:cursor-grabbing transition-all duration-200 relative border-l-4"
+                              style={{ borderLeftColor: col.colorHex || '#64748b' }}
                             >
                               {/* Topo do Card: Badge de Prioridade */}
                               <div className="flex items-center justify-between gap-2 mb-2">
@@ -1007,10 +1511,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                   </span>
                                 ) : (
                                   <span className={`font-bold text-[9px] px-2 py-0.5 rounded-md border ${isAlta
-                                      ? 'text-rose-700 bg-rose-50 border-rose-100'
-                                      : isMedia
-                                        ? 'text-brand-700 bg-brand-50 border-brand-100'
-                                        : 'text-slate-600 bg-slate-50 border-slate-100'
+                                    ? 'text-rose-700 bg-rose-50 border-rose-100'
+                                    : isMedia
+                                      ? 'text-brand-700 bg-brand-50 border-brand-100'
+                                      : 'text-slate-600 bg-slate-50 border-slate-100'
                                     }`}>
                                     {isAlta ? 'ALTA PRIORIDADE' : isMedia ? 'MÉDIA PRIORIDADE' : 'BAIXA PRIORIDADE'}
                                   </span>
@@ -1030,14 +1534,32 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                 </div>
                               )}
 
-                              {/* Tags do Card */}
-                              {card.tags && card.tags.length > 0 && (
-                                <div className="mt-3 flex flex-wrap gap-1">
-                                  {card.tags.map(t => (
-                                    <span key={t} className="text-[9px] font-bold bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400">
-                                      {t}
-                                    </span>
-                                  ))}
+                              {/* Etiquetas do Card */}
+                              {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                  {card.etiquetas && card.etiquetas.length > 0 ? (
+                                    card.etiquetas.map(et => {
+                                      const colors = getColors(et.cor);
+                                      return (
+                                        <span
+                                          key={et.id_etiqueta}
+                                          className="text-[9px] font-bold px-2 py-0.5 rounded border transition-all"
+                                          style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
+                                        >
+                                          {et.nome}
+                                        </span>
+                                      );
+                                    })
+                                  ) : (
+                                    card.tags.map(t => (
+                                      <span
+                                        key={t}
+                                        className="text-[9px] font-bold bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))
+                                  )}
                                 </div>
                               )}
 
@@ -1082,10 +1604,54 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               })}
 
               {/* Coluna "Nova Coluna" */}
-              <div className="flex flex-col border border-dashed border-slate-300 rounded-2xl w-72 p-4 shrink-0 items-center justify-center text-slate-400 hover:border-brand-500 hover:text-brand-600 transition-all cursor-pointer bg-white/30 hover:bg-white/50 select-none">
-                <Plus size={20} className="mb-1" />
-                <span className="font-extrabold text-xs tracking-wider uppercase">Nova Coluna</span>
-              </div>
+              {(isPO || isManager) && (
+                <div className="w-72 shrink-0 flex flex-col items-stretch">
+                  {isCreatingColumnInline ? (
+                    <div className="flex flex-col bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 flex-1 min-h-[200px]">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="Nome da coluna..."
+                        value={inlineColumnName}
+                        onChange={(e) => setInlineColumnName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateColumnInline(inlineColumnName);
+                          if (e.key === 'Escape') {
+                            setIsCreatingColumnInline(false);
+                            setInlineColumnName('');
+                          }
+                        }}
+                        className="w-full bg-white border border-slate-300 rounded-xl py-2 px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setIsCreatingColumnInline(false);
+                            setInlineColumnName('');
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 font-bold text-[10px]"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handleCreateColumnInline(inlineColumnName)}
+                          className="px-3 py-1.5 rounded-lg bg-[#320066] hover:bg-[#26004d] text-white font-bold text-[10px] shadow-sm"
+                        >
+                          Confirmar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => setIsCreatingColumnInline(true)}
+                      className="flex flex-col border border-dashed border-slate-300 rounded-2xl w-full flex-1 min-h-[150px] items-center justify-center text-slate-400 hover:border-brand-500 hover:text-brand-600 transition-all cursor-pointer bg-white/30 hover:bg-white/50 select-none animate-fade-in"
+                    >
+                      <Plus size={20} className="mb-1" />
+                      <span className="font-extrabold text-xs tracking-wider uppercase">Nova Coluna</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           </>
@@ -1196,8 +1762,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                   <div key={card.id_card} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left">
                                     <div className="flex justify-between items-center gap-2 mb-1">
                                       <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                          card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                            'bg-slate-50 text-slate-600 border border-slate-100'
+                                        card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                          'bg-slate-50 text-slate-600 border border-slate-100'
                                         }`}>
                                         {card.prioridade}
                                       </span>
@@ -1617,8 +2183,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                       type="button"
                       onClick={() => setNewCardPriority(p.id)}
                       className={`py-2 px-3 border rounded-xl text-center font-bold text-[10px] transition-all ${newCardPriority === p.id
-                          ? 'border-brand-600 bg-brand-600 text-white shadow-sm scale-[0.98]'
-                          : p.color
+                        ? 'border-brand-600 bg-brand-600 text-white shadow-sm scale-[0.98]'
+                        : p.color
                         }`}
                     >
                       {p.label}
@@ -1631,22 +2197,44 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide font-semibold">Tags Relacionadas</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {['FRONTEND', 'DESIGN', 'BACKEND', 'DEVOPS'].map(tag => {
-                    const isSelected = newCardTags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleFormTag(tag)}
-                        className={`px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${isSelected
+                  {project.etiquetas && project.etiquetas.length > 0 ? (
+                    project.etiquetas.map(et => {
+                      const isSelected = newCardEtiquetas.includes(et.id_etiqueta);
+                      const colors = getColors(et.cor);
+                      return (
+                        <button
+                          key={et.id_etiqueta}
+                          type="button"
+                          onClick={() => toggleFormEtiqueta(et.id_etiqueta)}
+                          className="px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all"
+                          style={{
+                            backgroundColor: isSelected ? et.cor : colors.bg,
+                            color: isSelected ? '#ffffff' : colors.text,
+                            borderColor: isSelected ? et.cor : colors.border
+                          }}
+                        >
+                          {et.nome}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    ['FRONTEND', 'DESIGN', 'BACKEND', 'DEVOPS'].map(tag => {
+                      const isSelected = newCardTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleFormTag(tag)}
+                          className={`px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${isSelected
                             ? 'bg-slate-800 border-slate-800 text-white'
                             : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
-                          }`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
+                            }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
@@ -1837,6 +2425,313 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               >
                 Sim, Remover
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================= MODAL DE CUSTOMIZAÇÃO DO BOARD (COLUNAS E ETIQUETAS) ================================= */}
+      {isBoardConfigModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-700">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl relative overflow-hidden text-left p-6 md:p-8 animate-scale-up flex flex-col max-h-[90vh]">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 shrink-0">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#320066] flex items-center gap-2">
+                  <Sliders size={18} />
+                  Configurar Quadro e Etiquetas
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">Gerencie as colunas do seu fluxo e as etiquetas de atividades.</p>
+              </div>
+              <button
+                onClick={() => setIsBoardConfigModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Tab Selector */}
+            <div className="flex border-b border-slate-100 mb-6 shrink-0">
+              <button
+                onClick={() => setBoardConfigTab('columns')}
+                className={`px-4 py-2.5 font-bold text-xs border-b-2 transition-all ${boardConfigTab === 'columns' ? 'border-[#320066] text-[#320066]' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+              >
+                Colunas (Fluxo)
+              </button>
+              <button
+                onClick={() => setBoardConfigTab('tags')}
+                className={`px-4 py-2.5 font-bold text-xs border-b-2 transition-all ${boardConfigTab === 'tags' ? 'border-[#320066] text-[#320066]' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
+              >
+                Etiquetas (Tags)
+              </button>
+            </div>
+
+            {/* Tab Content (Scrollable) */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+
+              {/* TAB COLUNAS */}
+              {boardConfigTab === 'columns' && (
+                <div className="space-y-6">
+                  {/* Nova Coluna Form */}
+                  <form onSubmit={handleCreateColumn} className="bg-slate-50 p-4 border border-slate-100 rounded-xl space-y-4">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nova Coluna</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Nome da Coluna</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: BLOQUEADO, REVIEW..."
+                          value={newColName}
+                          onChange={(e) => setNewColName(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Cor da Coluna</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PRESET_COLORS.map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setNewColColor(color)}
+                              className={`w-6 h-6 rounded-full border-2 transition-transform ${newColColor === color ? 'scale-110 shadow' : 'opacity-80 hover:opacity-100'}`}
+                              style={{ backgroundColor: color, borderColor: newColColor === color ? '#3b82f6' : 'transparent' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-2 border-t border-slate-100">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-[#320066] hover:bg-[#26004d] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
+                      >
+                        Adicionar Coluna
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Lista de Colunas */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Colunas Existentes (Ordem Esquerda para Direita)</h3>
+                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white overflow-hidden">
+                      {colunasList.map((col, idx, arr) => {
+                        const isEditing = editingColId === col.id_coluna;
+                        return (
+                          <div key={col.id_coluna} className="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                            {isEditing ? (
+                              <div className="flex flex-1 items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={editingColName}
+                                  onChange={(e) => setEditingColName(e.target.value)}
+                                  className="bg-white border border-slate-200 rounded-xl py-1 px-2.5 text-xs focus:outline-none focus:border-brand-500 font-bold text-slate-700"
+                                />
+                                <div className="flex gap-1">
+                                  {PRESET_COLORS.map(color => (
+                                    <button
+                                      key={color}
+                                      type="button"
+                                      onClick={() => setEditingColColor(color)}
+                                      className={`w-5 h-5 rounded-full border transition-transform ${editingColColor === color ? 'scale-110 shadow' : 'opacity-80'}`}
+                                      style={{ backgroundColor: color, borderColor: editingColColor === color ? '#111' : 'transparent' }}
+                                    />
+                                  ))}
+                                </div>
+                                <div className="flex gap-1.5 ml-auto">
+                                  <button
+                                    onClick={() => handleUpdateColumn(col.id_coluna)}
+                                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingColId(null)}
+                                    className="px-2.5 py-1 bg-slate-200 text-slate-650 rounded-lg text-[10px] font-bold"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: col.cor }} />
+                                  <span className="text-xs font-bold text-slate-800">{col.nome}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => handleMoveColumn(col.id_coluna, 'left')}
+                                    className="p-1 text-slate-400 hover:text-[#320066] disabled:opacity-30"
+                                    title="Mover Esquerda"
+                                  >
+                                    <ChevronLeft size={16} />
+                                  </button>
+                                  <button
+                                    disabled={idx === arr.length - 1}
+                                    onClick={() => handleMoveColumn(col.id_coluna, 'right')}
+                                    className="p-1 text-slate-400 hover:text-[#320066] disabled:opacity-30"
+                                    title="Mover Direita"
+                                  >
+                                    <ChevronRight size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingColId(col.id_coluna);
+                                      setEditingColName(col.nome);
+                                      setEditingColColor(col.cor);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-[#320066] ml-2"
+                                    title="Editar Coluna"
+                                  >
+                                    <Settings size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteColumn(col.id_coluna)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 ml-1"
+                                    title="Excluir Coluna"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB ETIQUETAS */}
+              {boardConfigTab === 'tags' && (
+                <div className="space-y-6">
+                  {/* Nova Etiqueta Form */}
+                  <form onSubmit={handleCreateTag} className="bg-slate-50 p-4 border border-slate-100 rounded-xl space-y-4">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nova Etiqueta</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Nome da Etiqueta</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: BUG, REFACTOR..."
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Cor da Etiqueta</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PRESET_COLORS.map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setNewTagColor(color)}
+                              className={`w-6 h-6 rounded-full border-2 transition-transform ${newTagColor === color ? 'scale-110 shadow' : 'opacity-80 hover:opacity-100'}`}
+                              style={{ backgroundColor: color, borderColor: newTagColor === color ? '#3b82f6' : 'transparent' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-2 border-t border-slate-100">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-[#320066] hover:bg-[#26004d] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
+                      >
+                        Adicionar Etiqueta
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Lista de Etiquetas */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Etiquetas Existentes</h3>
+                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white overflow-hidden">
+                      {(project.etiquetas || []).map(et => {
+                        const isEditing = editingTagId === et.id_etiqueta;
+                        const colors = getColors(et.cor);
+                        return (
+                          <div key={et.id_etiqueta} className="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                            {isEditing ? (
+                              <div className="flex flex-1 items-center gap-3">
+                                <input
+                                  type="text"
+                                  value={editingTagName}
+                                  onChange={(e) => setEditingTagName(e.target.value)}
+                                  className="bg-white border border-slate-200 rounded-xl py-1 px-2.5 text-xs focus:outline-none focus:border-brand-500 font-bold text-slate-700"
+                                />
+                                <div className="flex gap-1">
+                                  {PRESET_COLORS.map(color => (
+                                    <button
+                                      key={color}
+                                      type="button"
+                                      onClick={() => setEditingTagColor(color)}
+                                      className={`w-5 h-5 rounded-full border transition-transform ${editingTagColor === color ? 'scale-110 shadow' : 'opacity-80'}`}
+                                      style={{ backgroundColor: color, borderColor: editingTagColor === color ? '#111' : 'transparent' }}
+                                    />
+                                  ))}
+                                </div>
+                                <div className="flex gap-1.5 ml-auto">
+                                  <button
+                                    onClick={() => handleUpdateTag(et.id_etiqueta)}
+                                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTagId(null)}
+                                    className="px-2.5 py-1 bg-slate-200 text-slate-650 rounded-lg text-[10px] font-bold"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <span
+                                  className="text-[10px] font-bold px-2.5 py-1 rounded border animate-fade-in"
+                                  style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
+                                >
+                                  {et.nome}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      setEditingTagId(et.id_etiqueta);
+                                      setEditingTagName(et.nome);
+                                      setEditingTagColor(et.cor);
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-[#320066]"
+                                    title="Editar Etiqueta"
+                                  >
+                                    <Settings size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTag(et.id_etiqueta)}
+                                    className="p-1 text-slate-400 hover:text-rose-600"
+                                    title="Excluir Etiqueta"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

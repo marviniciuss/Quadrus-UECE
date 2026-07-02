@@ -16,6 +16,8 @@ export const criarCard = async (req, res) => {
     id_responsavel,
     id_sprint,
     story_points,
+    id_coluna,
+    id_etiquetas,
   } = req.body;
 
   try {
@@ -80,6 +82,21 @@ export const criarCard = async (req, res) => {
       }
     }
 
+    // Encontrar coluna de destino (primeira coluna do projeto se não informada)
+    let targetColunaId = id_coluna;
+    if (!targetColunaId) {
+      const primeiraColuna = await prisma.coluna.findFirst({
+        where: { id_projeto: id },
+        orderBy: { ordem: "asc" },
+      });
+      if (!primeiraColuna) {
+        return res.status(400).json({
+          error: "Projeto não possui colunas configuradas.",
+        });
+      }
+      targetColunaId = primeiraColuna.id_coluna;
+    }
+
     const card = await prisma.card.create({
       data: {
         id_projeto: id,
@@ -87,13 +104,20 @@ export const criarCard = async (req, res) => {
         descricao: descricao || null,
         prioridade: prioridade || "MEDIA",
         status: "A_FAZER",
+        id_coluna: targetColunaId,
         tags: tags || [],
         id_responsavel: id_responsavel || null,
         id_sprint: id_sprint || null,
         story_points: story_points ? parseInt(story_points) : null,
+        ...(id_etiquetas && id_etiquetas.length > 0 && {
+          etiquetas: {
+            connect: id_etiquetas.map((idEt) => ({ id_etiqueta: idEt })),
+          },
+        }),
       },
       include: {
         responsavel: true,
+        etiquetas: true,
       },
     });
 
@@ -139,6 +163,7 @@ export const listarCards = async (req, res) => {
       include: {
         responsavel: true,
         sprint: true,
+        etiquetas: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -169,6 +194,7 @@ export const buscarCard = async (req, res) => {
         projeto: true,
         anexos: true,
         votos: true,
+        etiquetas: true,
       },
     });
 
@@ -209,6 +235,8 @@ export const atualizarCard = async (req, res) => {
     id_sprint,
     story_points,
     em_risco,
+    id_coluna,
+    id_etiquetas,
   } = req.body;
 
   try {
@@ -267,6 +295,21 @@ export const atualizarCard = async (req, res) => {
       }
     }
 
+    // Validação: id_coluna deve pertencer ao mesmo projeto do card
+    if (id_coluna) {
+      const coluna = await prisma.coluna.findFirst({
+        where: {
+          id_coluna,
+          id_projeto: card.id_projeto,
+        },
+      });
+      if (!coluna) {
+        return res.status(400).json({
+          error: "A coluna informada não pertence a este projeto",
+        });
+      }
+    }
+
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
@@ -276,12 +319,19 @@ export const atualizarCard = async (req, res) => {
         ...(tags !== undefined && { tags }),
         ...(id_responsavel !== undefined && { id_responsavel }),
         ...(id_sprint !== undefined && { id_sprint }),
+        ...(id_coluna !== undefined && { id_coluna }),
         ...(story_points !== undefined && { story_points: story_points ? parseInt(story_points) : null }),
         ...(em_risco !== undefined && { em_risco }),
+        ...(id_etiquetas !== undefined && {
+          etiquetas: {
+            set: id_etiquetas.map((idEt) => ({ id_etiqueta: idEt })),
+          },
+        }),
       },
       include: {
         responsavel: true,
         sprint: true,
+        etiquetas: true,
       },
     });
 
@@ -342,22 +392,9 @@ export const excluirCard = async (req, res) => {
  ========================= */
 export const atualizarStatusCard = async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
-
-  const validStatuses = [
-    "A_FAZER",
-    "EM_ANDAMENTO",
-    "HOMOLOGACAO",
-    "CONCLUIDO",
-  ];
+  const { status, id_coluna } = req.body;
 
   try {
-    if (!status || !validStatuses.includes(status)) {
-      return res.status(400).json({
-        error: `Status inválido: ${validStatuses.join(", ")}`,
-      });
-    }
-
     const card = await prisma.card.findUnique({
       where: { id_card: id },
     });
@@ -376,18 +413,63 @@ export const atualizarStatusCard = async (req, res) => {
       });
     }
 
+    let targetColuna = null;
+    if (id_coluna) {
+      targetColuna = await prisma.coluna.findUnique({
+        where: { id_coluna },
+      });
+      if (!targetColuna || targetColuna.id_projeto !== card.id_projeto) {
+        return res.status(400).json({ error: "Coluna inválida" });
+      }
+    } else if (status) {
+      const validStatuses = [
+        "A_FAZER",
+        "EM_ANDAMENTO",
+        "HOMOLOGACAO",
+        "CONCLUIDO",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          error: `Status inválido: ${validStatuses.join(", ")}`,
+        });
+      }
+
+      let nomeColuna = "A FAZER";
+      if (status === "EM_ANDAMENTO") nomeColuna = "EM ANDAMENTO";
+      else if (status === "HOMOLOGACAO") nomeColuna = "HOMOLOGAÇÃO";
+      else if (status === "CONCLUIDO") nomeColuna = "CONCLUÍDO";
+
+      targetColuna = await prisma.coluna.findFirst({
+        where: { id_projeto: card.id_projeto, nome: nomeColuna },
+      });
+    }
+
+    if (!targetColuna) {
+      return res.status(400).json({
+        error: "Coluna de destino não encontrada",
+      });
+    }
+
+    // Mapear de volta para o status legado
+    let legacyStatus = "A_FAZER";
+    if (targetColuna.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
+    else if (targetColuna.nome === "HOMOLOGAÇÃO") legacyStatus = "HOMOLOGACAO";
+    else if (targetColuna.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
+
     // Auto-atribuição: se o card não tem responsável, atribui ao membro que moveu
     const deveAtribuir = !card.id_responsavel;
 
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
-        status,
+        id_coluna: targetColuna.id_coluna,
+        status: legacyStatus,
         ...(deveAtribuir && { id_responsavel: membro.id_usuario }),
       },
       include: {
         responsavel: true,
         sprint: true,
+        etiquetas: true,
       },
     });
 
@@ -397,8 +479,8 @@ export const atualizarStatusCard = async (req, res) => {
       io.to(card.id_projeto).emit('card_moved', cardAtualizado);
     }
 
-    // US05.02: Notificar Testers quando card é movido para HOMOLOGACAO
-    if (status === "HOMOLOGACAO") {
+    // US05.02: Notificar Testers quando card é movido para HOMOLOGAÇÃO
+    if (targetColuna.nome === "HOMOLOGAÇÃO") {
       try {
         // Buscar todos os membros TESTER do projeto
         const testers = await prisma.membroProjeto.findMany({

@@ -73,6 +73,8 @@ model Projeto {
   cards         Card[]
   arquivado     Boolean          @default(false)
   notificacoes  Notificacao[]
+  colunas       Coluna[]
+  etiquetas     Etiqueta[]
   
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -120,6 +122,7 @@ model Card {
   id_projeto     String           @db.Uuid
   id_sprint      String?          @db.Uuid
   id_responsavel String?          @db.Uuid
+  id_coluna      String?          @db.Uuid
   titulo         String
   descricao      String?          @db.Text
   prioridade     Prioridade       @default(MEDIA)
@@ -132,11 +135,13 @@ model Card {
   projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
   sprint         Sprint?          @relation(fields: [id_sprint], references: [id_sprint], onDelete: SetNull)
   responsavel    Usuario?         @relation("ResponsavelCards", fields: [id_responsavel], references: [id_usuario], onDelete: SetNull)
+  coluna         Coluna?          @relation(fields: [id_coluna], references: [id_coluna], onDelete: SetNull)
   
   anexos         AnexoCard[]
   votos          VotoPoker[]
   notificacoes   Notificacao[]
   logs           LogAcoes[]
+  etiquetas      Etiqueta[]
   
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -210,4 +215,35 @@ model LogAcoes {
   createdAt    DateTime          @default(now())
 
   @@map("log_acoes")
+}
+
+model Coluna {
+  id_coluna      String           @id @default(uuid()) @db.Uuid
+  id_projeto     String           @db.Uuid
+  nome           String
+  cor            String
+  ordem          Int
+  projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
+  cards          Card[]
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([id_projeto, nome])
+  @@map("colunas")
+}
+
+model Etiqueta {
+  id_etiqueta    String           @id @default(uuid()) @db.Uuid
+  id_projeto     String           @db.Uuid
+  nome           String
+  cor            String
+  projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
+  cards          Card[]
+  
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([id_projeto, nome])
+  @@map("etiquetas")
 }

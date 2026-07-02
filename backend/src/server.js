@@ -10,6 +10,8 @@ import usuarioRoutes from "./routes/usuarioRoutes.js";
 import cardRoutes from "./routes/cardRoutes.js";
 import sprintRoutes from "./routes/sprintRoutes.js";
 import notificacaoRoutes from "./routes/notificacaoRoutes.js";
+import colunaRoutes from "./routes/colunaRoutes.js";
+import etiquetaRoutes from "./routes/etiquetaRoutes.js";
 
 dotenv.config();
 
@@ -47,6 +49,8 @@ app.use("/api/usuarios", usuarioRoutes);
 app.use("/api", cardRoutes);
 app.use("/api", sprintRoutes);
 app.use("/api", notificacaoRoutes);
+app.use("/api", colunaRoutes);
+app.use("/api", etiquetaRoutes);
 
 // Socket.io setup
 const io = new Server(httpServer, {

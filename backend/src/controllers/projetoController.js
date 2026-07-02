@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { garantirCustomizacaoInicial } from "../utils/garantirCustomizacaoInicial.js";
 
 // Perfis válidos do sistema
 const PERFIS_VALIDOS = ['ADMIN', 'GERENTE', 'PO', 'DEV', 'TESTER'];
@@ -75,6 +76,9 @@ export const obterProjeto = async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Garantir colunas e etiquetas padrão se não existirem
+    await garantirCustomizacaoInicial(id);
+
     const projeto = await prisma.projeto.findUnique({
       where: { id_projeto: id },
       include: {
@@ -82,9 +86,16 @@ export const obterProjeto = async (req, res) => {
           include: { usuario: true },
         },
         sprints: true,
+        colunas: {
+          orderBy: { ordem: "asc" },
+        },
+        etiquetas: true,
         cards: {
           where: { deletado_em: null },
-          include: { responsavel: true },
+          include: {
+            responsavel: true,
+            etiquetas: true,
+          },
         },
       },
     });
@@ -136,16 +147,34 @@ export const criarProjeto = async (req, res) => {
           },
         },
       },
+    });
+
+    // Inicializar as colunas e etiquetas padrões imediatamente
+    await garantirCustomizacaoInicial(projeto.id_projeto);
+
+    // Buscar o projeto completo com as colunas e etiquetas inicializadas
+    const projetoCompleto = await prisma.projeto.findUnique({
+      where: { id_projeto: projeto.id_projeto },
       include: {
         membros: {
           include: { usuario: true },
         },
         sprints: true,
-        cards: true,
+        colunas: {
+          orderBy: { ordem: "asc" },
+        },
+        etiquetas: true,
+        cards: {
+          where: { deletado_em: null },
+          include: {
+            responsavel: true,
+            etiquetas: true,
+          },
+        },
       },
     });
 
-    return res.status(201).json(projeto);
+    return res.status(201).json(projetoCompleto);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Erro ao criar projeto" });
