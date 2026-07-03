@@ -1,8 +1,8 @@
 import prisma from "../lib/prisma.js";
 import { obterMembroProjeto } from "../utils/projetoAuth.js";
 
-// Valores válidos: Fibonacci [1, 2, 3, 5, 8, 13, 21, 34, 55], 0 (caso queiram usar) ou -1 (para representar "?")
-const VALORES_POKER_VALIDOS = [-1, 0, 1, 2, 3, 5, 8, 13, 21, 34, 55];
+// Valores válidos: Fibonacci [1, 2, 3, 5, 8, 13, 21] ou -1 (para representar "não sei")
+const VALORES_POKER_VALIDOS = [-1, 1, 2, 3, 5, 8, 13, 21];
 
 /**
  * Listar todos os votos de um card

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../utils/api.js';
 import { socket, joinProjectRoom, leaveProjectRoom } from '../utils/socket.js';
+import CardDetailModal from './CardDetailModal.jsx';
+import BoardConfigModal from './BoardConfigModal.jsx';
+import InviteMemberModal from './InviteMemberModal.jsx';
 import {
   FolderKanban,
   Calendar,
@@ -295,6 +298,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Modal de confirmação para remoção de membro
   const [isRemoveMemberModalOpen, setIsRemoveMemberModalOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState(null);
+
+  // Card Detail Modal State
+  const [selectedCardId, setSelectedCardId] = useState(null);
 
   // Reset invite modal state when closed
   useEffect(() => {
@@ -1544,7 +1550,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               draggable
                               onDragStart={(e) => handleDragStart(e, card.id_card)}
                               onDragEnd={handleDragEnd}
-                              className="group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-grab active:cursor-grabbing transition-all duration-200 relative border-l-4"
+                              onClick={() => setSelectedCardId(card.id_card)}
+                              className="group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4"
                               style={{ borderLeftColor: col.colorHex || '#64748b' }}
                             >
                               {/* Topo do Card: Badge de Prioridade */}
@@ -1933,13 +1940,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                     return <p className="text-sm text-slate-500 text-center py-6">Nenhuma tarefa no backlog.</p>;
                                   }
                                   return backlogCards.map(card => (
-                                    <div key={card.id_card} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-brand-300 bg-slate-50">
+                                    <div key={card.id_card} onClick={() => { setSelectedCardId(card.id_card); setIsBacklogModalOpen(false); }} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-brand-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                       <div>
                                         <p className="text-sm font-bold text-slate-700">{card.titulo}</p>
                                         <p className="text-xs text-slate-500 mt-1">Prioridade: {card.prioridade}</p>
                                       </div>
                                       <button 
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setSprintClosingMoves(prev => ({ ...prev, [card.id_card]: 'right' }));
                                           setIsBacklogModalOpen(false);
                                         }}
@@ -2440,79 +2448,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       )}
 
       {/* ================================= MODAL DE CONVITE DE MEMBRO ================================= */}
-      {isInviteModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden text-left p-6 md:p-8 animate-scale-up">
-
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-extrabold text-brand-700 flex items-center gap-2">
-                  <UserPlus size={18} />
-                  Convidar Membro
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">Adicione um novo colega ao projeto.</p>
-              </div>
-              <button
-                onClick={() => setIsInviteModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleInviteMember} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  E-mail do Usuário
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="Digite o e-mail do usuário..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 text-slate-700"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Perfil de Acesso
-                </label>
-                <select
-                  value={invitePerfil}
-                  onChange={(e) => setInvitePerfil(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-slate-700 appearance-none"
-                >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="GERENTE">GERENTE</option>
-                  <option value="PO">PO</option>
-                  <option value="DEV">DEV</option>
-                  <option value="TESTER">TESTER</option>
-                </select>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsInviteModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={invitingMember}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm transition-all shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                >
-                  {invitingMember && <Loader2 size={16} className="animate-spin" />}
-                  Convidar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <InviteMemberModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        project={project}
+        onUpdateProject={onUpdateProject}
+        showToast={showToast}
+        isManager={isManager}
+      />
 
       {/* ================================= MODAL DE REMOÇÃO DE MEMBRO ================================= */}
       {isRemoveMemberModalOpen && memberToRemove && (
@@ -2544,312 +2487,24 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       )}
 
       {/* ================================= MODAL DE CUSTOMIZAÇÃO DO BOARD (COLUNAS E ETIQUETAS) ================================= */}
-      {isBoardConfigModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-700">
-          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-2xl relative overflow-hidden text-left p-6 md:p-8 animate-scale-up flex flex-col max-h-[90vh]">
+      <BoardConfigModal
+        isOpen={isBoardConfigModalOpen}
+        onClose={() => setIsBoardConfigModalOpen(false)}
+        project={project}
+        onUpdateProject={onUpdateProject}
+        showToast={showToast}
+        isManager={isManager}
+      />
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 shrink-0">
-              <div>
-                <h2 className="text-lg font-extrabold text-[#320066] flex items-center gap-2">
-                  <Sliders size={18} />
-                  Configurar Quadro e Etiquetas
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">Gerencie as colunas do seu fluxo e as etiquetas de atividades.</p>
-              </div>
-              <button
-                onClick={() => setIsBoardConfigModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Tab Selector */}
-            <div className="flex border-b border-slate-100 mb-6 shrink-0">
-              <button
-                onClick={() => setBoardConfigTab('columns')}
-                className={`px-4 py-2.5 font-bold text-xs border-b-2 transition-all ${boardConfigTab === 'columns' ? 'border-[#320066] text-[#320066]' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
-              >
-                Colunas (Fluxo)
-              </button>
-              <button
-                onClick={() => setBoardConfigTab('tags')}
-                className={`px-4 py-2.5 font-bold text-xs border-b-2 transition-all ${boardConfigTab === 'tags' ? 'border-[#320066] text-[#320066]' : 'border-transparent text-slate-400 hover:text-slate-700'}`}
-              >
-                Etiquetas (Tags)
-              </button>
-            </div>
-
-            {/* Tab Content (Scrollable) */}
-            <div className="flex-1 overflow-y-auto pr-1 space-y-6">
-
-              {/* TAB COLUNAS */}
-              {boardConfigTab === 'columns' && (
-                <div className="space-y-6">
-                  {/* Nova Coluna Form */}
-                  <form onSubmit={handleCreateColumn} className="bg-slate-50 p-4 border border-slate-100 rounded-xl space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nova Coluna</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Nome da Coluna</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ex: BLOQUEADO, REVIEW..."
-                          value={newColName}
-                          onChange={(e) => setNewColName(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Cor da Coluna</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {PRESET_COLORS.map(color => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => setNewColColor(color)}
-                              className={`w-6 h-6 rounded-full border-2 transition-transform ${newColColor === color ? 'scale-110 shadow' : 'opacity-80 hover:opacity-100'}`}
-                              style={{ backgroundColor: color, borderColor: newColColor === color ? '#3b82f6' : 'transparent' }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-2 border-t border-slate-100">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-[#320066] hover:bg-[#26004d] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
-                      >
-                        Adicionar Coluna
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Lista de Colunas */}
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Colunas Existentes (Ordem Esquerda para Direita)</h3>
-                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white overflow-hidden">
-                      {colunasList.map((col, idx, arr) => {
-                        const isEditing = editingColId === col.id_coluna;
-                        return (
-                          <div key={col.id_coluna} className="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                            {isEditing ? (
-                              <div className="flex flex-1 items-center gap-3">
-                                <input
-                                  type="text"
-                                  value={editingColName}
-                                  onChange={(e) => setEditingColName(e.target.value)}
-                                  className="bg-white border border-slate-200 rounded-xl py-1 px-2.5 text-xs focus:outline-none focus:border-brand-500 font-bold text-slate-700"
-                                />
-                                <div className="flex gap-1">
-                                  {PRESET_COLORS.map(color => (
-                                    <button
-                                      key={color}
-                                      type="button"
-                                      onClick={() => setEditingColColor(color)}
-                                      className={`w-5 h-5 rounded-full border transition-transform ${editingColColor === color ? 'scale-110 shadow' : 'opacity-80'}`}
-                                      style={{ backgroundColor: color, borderColor: editingColColor === color ? '#111' : 'transparent' }}
-                                    />
-                                  ))}
-                                </div>
-                                <div className="flex gap-1.5 ml-auto">
-                                  <button
-                                    onClick={() => handleUpdateColumn(col.id_coluna)}
-                                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold"
-                                  >
-                                    Salvar
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingColId(null)}
-                                    className="px-2.5 py-1 bg-slate-200 text-slate-650 rounded-lg text-[10px] font-bold"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2.5">
-                                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: col.cor }} />
-                                  <span className="text-xs font-bold text-slate-800">{col.nome}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    disabled={idx === 0}
-                                    onClick={() => handleMoveColumn(col.id_coluna, 'left')}
-                                    className="p-1 text-slate-400 hover:text-[#320066] disabled:opacity-30"
-                                    title="Mover Esquerda"
-                                  >
-                                    <ChevronLeft size={16} />
-                                  </button>
-                                  <button
-                                    disabled={idx === arr.length - 1}
-                                    onClick={() => handleMoveColumn(col.id_coluna, 'right')}
-                                    className="p-1 text-slate-400 hover:text-[#320066] disabled:opacity-30"
-                                    title="Mover Direita"
-                                  >
-                                    <ChevronRight size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingColId(col.id_coluna);
-                                      setEditingColName(col.nome);
-                                      setEditingColColor(col.cor);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-[#320066] ml-2"
-                                    title="Editar Coluna"
-                                  >
-                                    <Settings size={14} />
-                                  </button>
-                                  {!['A FAZER', 'EM ANDAMENTO', 'HOMOLOGAÇÃO', 'CONCLUÍDO'].includes(col.nome) && (
-                                    <button
-                                      onClick={() => handleDeleteColumn(col.id_coluna)}
-                                      className="p-1 text-slate-400 hover:text-rose-600 ml-1"
-                                      title="Excluir Coluna"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB ETIQUETAS */}
-              {boardConfigTab === 'tags' && (
-                <div className="space-y-6">
-                  {/* Nova Etiqueta Form */}
-                  <form onSubmit={handleCreateTag} className="bg-slate-50 p-4 border border-slate-100 rounded-xl space-y-4">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Nova Etiqueta</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Nome da Etiqueta</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ex: BUG, REFACTOR..."
-                          value={newTagName}
-                          onChange={(e) => setNewTagName(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Cor da Etiqueta</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {PRESET_COLORS.map(color => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => setNewTagColor(color)}
-                              className={`w-6 h-6 rounded-full border-2 transition-transform ${newTagColor === color ? 'scale-110 shadow' : 'opacity-80 hover:opacity-100'}`}
-                              style={{ backgroundColor: color, borderColor: newTagColor === color ? '#3b82f6' : 'transparent' }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-2 border-t border-slate-100">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-[#320066] hover:bg-[#26004d] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
-                      >
-                        Adicionar Etiqueta
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Lista de Etiquetas */}
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Etiquetas Existentes</h3>
-                    <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white overflow-hidden">
-                      {(project.etiquetas || []).map(et => {
-                        const isEditing = editingTagId === et.id_etiqueta;
-                        const colors = getColors(et.cor);
-                        return (
-                          <div key={et.id_etiqueta} className="p-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                            {isEditing ? (
-                              <div className="flex flex-1 items-center gap-3">
-                                <input
-                                  type="text"
-                                  value={editingTagName}
-                                  onChange={(e) => setEditingTagName(e.target.value)}
-                                  className="bg-white border border-slate-200 rounded-xl py-1 px-2.5 text-xs focus:outline-none focus:border-brand-500 font-bold text-slate-700"
-                                />
-                                <div className="flex gap-1">
-                                  {PRESET_COLORS.map(color => (
-                                    <button
-                                      key={color}
-                                      type="button"
-                                      onClick={() => setEditingTagColor(color)}
-                                      className={`w-5 h-5 rounded-full border transition-transform ${editingTagColor === color ? 'scale-110 shadow' : 'opacity-80'}`}
-                                      style={{ backgroundColor: color, borderColor: editingTagColor === color ? '#111' : 'transparent' }}
-                                    />
-                                  ))}
-                                </div>
-                                <div className="flex gap-1.5 ml-auto">
-                                  <button
-                                    onClick={() => handleUpdateTag(et.id_etiqueta)}
-                                    className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold"
-                                  >
-                                    Salvar
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingTagId(null)}
-                                    className="px-2.5 py-1 bg-slate-200 text-slate-650 rounded-lg text-[10px] font-bold"
-                                  >
-                                    Cancelar
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <span
-                                  className="text-[10px] font-bold px-2.5 py-1 rounded border animate-fade-in"
-                                  style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
-                                >
-                                  {et.nome}
-                                </span>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => {
-                                      setEditingTagId(et.id_etiqueta);
-                                      setEditingTagName(et.nome);
-                                      setEditingTagColor(et.cor);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-[#320066]"
-                                    title="Editar Etiqueta"
-                                  >
-                                    <Settings size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTag(et.id_etiqueta)}
-                                    className="p-1 text-slate-400 hover:text-rose-600"
-                                    title="Excluir Etiqueta"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
+      {selectedCardId && (
+        <CardDetailModal
+          cardId={selectedCardId}
+          project={project}
+          currentUserEmail={currentUserEmail}
+          onClose={() => { setSelectedCardId(null); }}
+          onUpdateProject={onUpdateProject}
+          showToast={showToast}
+        />
       )}
 
     </div>
