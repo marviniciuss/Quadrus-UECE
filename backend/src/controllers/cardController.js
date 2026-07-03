@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { obterMembroProjeto } from "../utils/projetoAuth.js";
+import { registrarLog } from "../utils/registrarLog.js";
 
 const PRIORIDADES_VALIDAS = ["BAIXA", "MEDIA", "ALTA"];
 
@@ -120,6 +121,14 @@ export const criarCard = async (req, res) => {
         responsavel: true,
         etiquetas: true,
       },
+    });
+
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: `Criou o card "${card.titulo}"`,
+      tipo_acao: "CRIACAO",
+      id_card: card.id_card,
+      id_sprint: card.id_sprint,
     });
 
     return res.status(201).json(card);
@@ -346,6 +355,14 @@ export const atualizarCard = async (req, res) => {
       },
     });
 
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: `Atualizou o card "${cardAtualizado.titulo}"`,
+      tipo_acao: "ALERTA",
+      id_card: cardAtualizado.id_card,
+      id_sprint: cardAtualizado.id_sprint,
+    });
+
     return res.json(cardAtualizado);
   } catch (error) {
     console.error(error);
@@ -395,6 +412,14 @@ export const excluirCard = async (req, res) => {
       data: {
         deletado_em: new Date(),
       },
+    });
+
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: `Removeu o card "${card.titulo}"`,
+      tipo_acao: "ALERTA",
+      id_card: card.id_card,
+      id_sprint: card.id_sprint,
     });
 
     return res.json({
@@ -493,6 +518,16 @@ export const atualizarStatusCard = async (req, res) => {
         etiquetas: true,
       },
     });
+
+    if (card.id_coluna !== targetColuna.id_coluna) {
+      await registrarLog({
+        id_usuario: membro.id_usuario,
+        acao: `Moveu o card "${card.titulo}" para a coluna "${targetColuna.nome}"`,
+        tipo_acao: "MOVIMENTACAO",
+        id_card: card.id_card,
+        id_sprint: card.id_sprint,
+      });
+    }
 
     // Emitir evento Socket.io para sincronização em tempo real
     const io = req.app.get('io');

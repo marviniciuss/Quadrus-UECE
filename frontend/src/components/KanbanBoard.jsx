@@ -4,6 +4,7 @@ import { socket, joinProjectRoom, leaveProjectRoom } from '../utils/socket.js';
 import CardDetailModal from './CardDetailModal.jsx';
 import BoardConfigModal from './BoardConfigModal.jsx';
 import InviteMemberModal from './InviteMemberModal.jsx';
+import ActivityLogsModal from './ActivityLogsModal.jsx';
 import {
   FolderKanban,
   Calendar,
@@ -28,7 +29,8 @@ import {
   ChevronsRight,
   Sliders,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  History
 } from 'lucide-react';
 
 // Componente de Toast para notificações inline
@@ -262,6 +264,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
 
   const [newCardEtiquetas, setNewCardEtiquetas] = useState([]);
   const [isBoardConfigModalOpen, setIsBoardConfigModalOpen] = useState(false);
+  const [isActivityLogsModalOpen, setIsActivityLogsModalOpen] = useState(false);
   const [boardConfigTab, setBoardConfigTab] = useState('columns'); // 'columns' | 'tags'
 
   // Colunas states
@@ -1602,6 +1605,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 )}
 
                 <button
+                  onClick={() => setIsActivityLogsModalOpen(true)}
+                  className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                  title="Histórico de Atividades do Projeto"
+                >
+                  <History size={16} />
+                </button>
+
+                <button
                   onClick={() => setIsBoardConfigModalOpen(true)}
                   className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
                   title="Configurar Quadro (Colunas e Etiquetas)"
@@ -2826,6 +2837,12 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
         onUpdateProject={onUpdateProject}
         showToast={showToast}
         isManager={isManager}
+      />
+
+      <ActivityLogsModal
+        isOpen={isActivityLogsModalOpen}
+        onClose={() => setIsActivityLogsModalOpen(false)}
+        project={project}
       />
 
       {selectedCardId && (

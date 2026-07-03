@@ -15,6 +15,7 @@ import etiquetaRoutes from "./routes/etiquetaRoutes.js";
 import membroProjetoRoutes from "./routes/membroProjetoRoutes.js";
 import anexoCardRoutes from "./routes/anexoCardRoutes.js";
 import votoPokerRoutes from "./routes/votoPokerRoutes.js";
+import logRoutes from "./routes/logRoutes.js";
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ app.use("/api", etiquetaRoutes);
 app.use("/api", membroProjetoRoutes);
 app.use("/api", anexoCardRoutes);
 app.use("/api", votoPokerRoutes);
+app.use("/api", logRoutes);
 
 // Socket.io setup
 const io = new Server(httpServer, {
