@@ -1522,14 +1522,85 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               </div>
 
               {/* Filtros e customização */}
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 relative">
                 <button
-                  onClick={() => { setSelectedTag(''); setSearchTerm(''); }}
-                  className="p-2.5 text-slate-400 hover:text-slate-650 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
-                  title="Limpar Filtros"
+                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                  className={`p-2.5 border rounded-xl transition-colors shrink-0 flex items-center gap-1.5 ${
+                    isFilterDropdownOpen || selectedMemberFilter || selectedPriorityFilter
+                      ? 'bg-[#320066]/10 border-brand-500 text-brand-700 font-bold'
+                      : 'text-slate-500 hover:text-[#320066] hover:bg-slate-100 border-slate-200'
+                  }`}
+                  title="Filtrar Atividades"
                 >
                   <Filter size={16} />
+                  {(selectedMemberFilter || selectedPriorityFilter) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse" />
+                  )}
                 </button>
+
+                {isFilterDropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setIsFilterDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-30 animate-fade-in text-slate-700 text-left">
+                      <h4 className="text-xs font-bold text-[#320066] uppercase tracking-wider mb-3">Filtrar Atividades</h4>
+                      
+                      <div className="space-y-3.5">
+                        {/* Filtro por Responsável */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Responsável</label>
+                          <select
+                            value={selectedMemberFilter}
+                            onChange={(e) => setSelectedMemberFilter(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
+                          >
+                            <option value="">Todos</option>
+                            <option value="unassigned">Sem responsável</option>
+                            {(project.membros || []).map(m => (
+                              <option key={m.id_usuario} value={m.id_usuario}>
+                                {m.nome}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Filtro por Prioridade */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Prioridade</label>
+                          <select
+                            value={selectedPriorityFilter}
+                            onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
+                          >
+                            <option value="">Todas</option>
+                            <option value="ALTA">Alta</option>
+                            <option value="MEDIA">Média</option>
+                            <option value="BAIXA">Baixa</option>
+                          </select>
+                        </div>
+
+                        {/* Botão de Limpar */}
+                        {(selectedMemberFilter || selectedPriorityFilter || selectedTag || searchTerm) ? (
+                          <button
+                            onClick={() => {
+                              setSelectedMemberFilter('');
+                              setSelectedPriorityFilter('');
+                              setSelectedTag('');
+                              setSearchTerm('');
+                              setIsFilterDropdownOpen(false);
+                            }}
+                            className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-xl text-xs font-bold transition-all"
+                          >
+                            Limpar Filtros
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <button
                   onClick={() => setIsBoardConfigModalOpen(true)}
                   className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
