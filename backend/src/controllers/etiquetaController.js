@@ -15,8 +15,8 @@ export const criarEtiqueta = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(idProjeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar etiquetas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar etiquetas" });
     }
 
     // Garantir customização inicial das etiquetas padrão
@@ -69,8 +69,8 @@ export const atualizarEtiqueta = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(etiqueta.id_projeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar etiquetas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar etiquetas" });
     }
 
     // Garantir customização inicial
@@ -124,8 +124,8 @@ export const deletarEtiqueta = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(etiqueta.id_projeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar etiquetas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar etiquetas" });
     }
 
     // Garantir customização inicial

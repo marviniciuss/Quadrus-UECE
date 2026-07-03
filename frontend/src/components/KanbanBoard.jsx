@@ -1449,7 +1449,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 )}
 
                 {/* Botão de Adicionar/Gerenciar Etiquetas ao fim da lista */}
-                {(isPO || isManager) && (
+                {isManager && (
                   <button
                     onClick={() => {
                       setBoardConfigTab('tags');
@@ -1530,15 +1530,13 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 >
                   <Filter size={16} />
                 </button>
-                {(isPO || isManager) && (
-                  <button
-                    onClick={() => setIsBoardConfigModalOpen(true)}
-                    className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
-                    title="Customizar Quadro (Colunas e Etiquetas)"
-                  >
-                    <Sliders size={16} />
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsBoardConfigModalOpen(true)}
+                  className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                  title="Configurar Quadro (Colunas e Etiquetas)"
+                >
+                  <Sliders size={16} />
+                </button>
               </div>
 
             </div>
@@ -1565,7 +1563,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     key={col.id}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, col.id)}
-                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-72 p-4 shrink-0 shadow-sm h-full min-h-0"
+                    className="flex flex-col bg-slate-100 border border-slate-200/60 rounded-2xl w-64 p-4 shrink-0 shadow-sm h-full min-h-0"
                   >
                     {/* Header da Coluna */}
                     <div className="flex items-center justify-between mb-4 relative">
@@ -1591,7 +1589,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                           <span
                             className="font-extrabold text-sm text-slate-800 tracking-tight cursor-pointer hover:text-[#320066] truncate"
                             onDoubleClick={() => {
-                              if (isPO || isManager) {
+                              if (isManager) {
                                 setEditingColumnHeaderId(col.id);
                                 setEditingColumnHeaderName(col.label);
                               }
@@ -1607,7 +1605,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                       </div>
 
                       {/* Botão de Opções da Coluna */}
-                      {(isPO || isManager) && (
+                      {isManager && (
                         <div className="relative shrink-0">
                           <button
                             onClick={() => setActiveColumnMenu(activeColumnMenu === col.id ? null : col.id)}
@@ -1805,8 +1803,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               })}
 
               {/* Coluna "Nova Coluna" */}
-              {(isPO || isManager) && (
-                <div className="w-72 shrink-0 flex flex-col items-stretch">
+              {isManager && (
+                <div className="w-64 shrink-0 flex flex-col items-stretch">
                   {isCreatingColumnInline ? (
                     <div className="flex flex-col bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 flex-1 min-h-[200px]">
                       <input
@@ -1917,7 +1915,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                         </div>
                                       ))}
                                       {unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).length === 0 && (
-                                        <p className="text-slate-400 text-xs py-4 text-center">Nenhum card pendente nesta sprint</p>
+                                        <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                                          <Calendar size={20} className="mb-1" />
+                                          <p className="text-[10px] font-semibold">Nenhum card pendente nesta sprint</p>
+                                        </div>
                                       )}
                                     </div>
                                   </div>

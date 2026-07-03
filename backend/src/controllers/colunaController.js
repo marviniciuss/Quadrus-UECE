@@ -15,8 +15,8 @@ export const criarColuna = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(idProjeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar colunas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar colunas" });
     }
 
     // Garantir customização inicial das colunas padrão
@@ -62,8 +62,8 @@ export const atualizarColuna = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(coluna.id_projeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar colunas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar colunas" });
     }
 
     // Garantir customização inicial
@@ -97,8 +97,8 @@ export const reordenarColunas = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(idProjeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar colunas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar colunas" });
     }
 
     // Garantir customização inicial
@@ -137,8 +137,8 @@ export const deletarColuna = async (req, res) => {
     }
 
     const membro = await obterMembroProjeto(coluna.id_projeto, req.user.email);
-    if (!membro || (membro.perfil !== "PO" && membro.perfil !== "GERENTE")) {
-      return res.status(403).json({ error: "Acesso negado: apenas PO e Gerentes podem gerenciar colunas" });
+    if (!membro || membro.perfil !== "GERENTE") {
+      return res.status(403).json({ error: "Acesso negado: apenas o Gerente pode gerenciar colunas" });
     }
 
     // Garantir customização inicial
