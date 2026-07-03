@@ -1272,18 +1272,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
                 {(project.etiquetas && project.etiquetas.length > 0) ? (
                   project.etiquetas.map(et => {
-                    const colors = getColors(et.cor);
                     const isSelected = selectedTag === et.nome;
                     return (
                       <button
                         key={et.id_etiqueta}
                         onClick={() => setSelectedTag(selectedTag === et.nome ? '' : et.nome)}
-                        className="px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shadow-sm shrink-0"
-                        style={{
-                          backgroundColor: isSelected ? et.cor : colors.bg,
-                          color: isSelected ? '#ffffff' : colors.text,
-                          borderColor: isSelected ? et.cor : colors.border
-                        }}
+                        className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shrink-0 ${
+                          isSelected
+                            ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                            : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                        }`}
                       >
                         {et.nome}
                       </button>
@@ -1294,10 +1292,11 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     <button
                       key={tag}
                       onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
-                      className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shrink-0 ${selectedTag === tag
-                        ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                        }`}
+                      className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition-all active:scale-95 shrink-0 ${
+                        selectedTag === tag
+                          ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                          : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                      }`}
                     >
                       {tag}
                     </button>
@@ -1590,23 +1589,19 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                   {card.etiquetas && card.etiquetas.length > 0 ? (
-                                    card.etiquetas.map(et => {
-                                      const colors = getColors(et.cor);
-                                      return (
-                                        <span
-                                          key={et.id_etiqueta}
-                                          className="text-[9px] font-bold px-2 py-0.5 rounded border transition-all"
-                                          style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
-                                        >
-                                          {et.nome}
-                                        </span>
-                                      );
-                                    })
+                                    card.etiquetas.map(et => (
+                                      <span
+                                        key={et.id_etiqueta}
+                                        className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent transition-all"
+                                      >
+                                        {et.nome}
+                                      </span>
+                                    ))
                                   ) : (
                                     card.tags.map(t => (
                                       <span
                                         key={t}
-                                        className="text-[9px] font-bold bg-slate-50 border border-slate-100 px-2 py-0.5 rounded text-slate-400"
+                                        className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent"
                                       >
                                         {t}
                                       </span>
@@ -2321,18 +2316,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                   {project.etiquetas && project.etiquetas.length > 0 ? (
                     project.etiquetas.map(et => {
                       const isSelected = newCardEtiquetas.includes(et.id_etiqueta);
-                      const colors = getColors(et.cor);
                       return (
                         <button
                           key={et.id_etiqueta}
                           type="button"
                           onClick={() => toggleFormEtiqueta(et.id_etiqueta)}
-                          className="px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all"
-                          style={{
-                            backgroundColor: isSelected ? et.cor : colors.bg,
-                            color: isSelected ? '#ffffff' : colors.text,
-                            borderColor: isSelected ? et.cor : colors.border
-                          }}
+                          className={`px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${
+                            isSelected
+                              ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                              : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                          }`}
                         >
                           {et.nome}
                         </button>
@@ -2346,10 +2339,11 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                           key={tag}
                           type="button"
                           onClick={() => toggleFormTag(tag)}
-                          className={`px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${isSelected
-                            ? 'bg-slate-800 border-slate-800 text-white'
-                            : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
-                            }`}
+                          className={`px-3 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${
+                            isSelected
+                              ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                              : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                          }`}
                         >
                           {tag}
                         </button>

@@ -440,8 +440,7 @@ export default function BoardConfigModal({ isOpen, onClose, project, onUpdatePro
                         ) : (
                           <>
                             <span
-                              className="text-[10px] font-bold px-2.5 py-1 rounded border animate-fade-in"
-                              style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
+                              className="text-[10px] font-bold px-2.5 py-1 rounded bg-[#EAECEF] text-[#475569] border border-transparent animate-fade-in"
                             >
                               {et.nome}
                             </span>

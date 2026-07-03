@@ -934,17 +934,15 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               <div className="flex flex-wrap gap-1.5">
                 {project.etiquetas?.map(et => {
                   const isSelected = selectedCard.etiquetas?.some(cardEt => cardEt.id_etiqueta === et.id_etiqueta);
-                  const colors = getColors(et.cor);
                   return (
                     <button
                       key={et.id_etiqueta}
                       onClick={() => handleToggleCardEtiqueta(et.id_etiqueta)}
-                      className="px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all"
-                      style={{
-                        backgroundColor: isSelected ? et.cor : colors.bg,
-                        color: isSelected ? '#ffffff' : colors.text,
-                        borderColor: isSelected ? et.cor : colors.border
-                      }}
+                      className={`px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${
+                        isSelected
+                          ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                          : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                      }`}
                     >
                       {et.nome}
                     </button>
