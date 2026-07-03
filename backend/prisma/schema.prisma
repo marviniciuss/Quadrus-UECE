@@ -53,6 +53,7 @@ model Usuario {
   foto          String?
   membros       MembroProjeto[]
   cards         Card[]           @relation("ResponsavelCards")
+  cardsCriados  Card[]           @relation("CriadorCards")
   votos         VotoPoker[]
   notificacoes  Notificacao[]    @relation("DestinoNotificacoes")
   logs          LogAcoes[]
@@ -123,6 +124,7 @@ model Card {
   id_sprint      String?          @db.Uuid
   id_responsavel String?          @db.Uuid
   id_coluna      String?          @db.Uuid
+  id_criador     String?          @db.Uuid
   titulo         String
   descricao      String?          @db.Text
   prioridade     Prioridade       @default(MEDIA)
@@ -135,6 +137,7 @@ model Card {
   projeto        Projeto          @relation(fields: [id_projeto], references: [id_projeto], onDelete: Cascade)
   sprint         Sprint?          @relation(fields: [id_sprint], references: [id_sprint], onDelete: SetNull)
   responsavel    Usuario?         @relation("ResponsavelCards", fields: [id_responsavel], references: [id_usuario], onDelete: SetNull)
+  criador        Usuario?         @relation("CriadorCards", fields: [id_criador], references: [id_usuario], onDelete: SetNull)
   coluna         Coluna?          @relation(fields: [id_coluna], references: [id_coluna], onDelete: SetNull)
   
   anexos         AnexoCard[]

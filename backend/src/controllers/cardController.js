@@ -108,6 +108,7 @@ export const criarCard = async (req, res) => {
         tags: tags || [],
         id_responsavel: id_responsavel || null,
         id_sprint: id_sprint || null,
+        id_criador: membro.id_usuario,
         story_points: story_points ? parseInt(story_points) : null,
         ...(id_etiquetas && id_etiquetas.length > 0 && {
           etiquetas: {
@@ -258,6 +259,16 @@ export const atualizarCard = async (req, res) => {
       });
     }
 
+    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isPO = membro.perfil === "PO";
+    const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
+
+    if (!isGerente && !isPO && !isCriador) {
+      return res.status(403).json({
+        error: "Acesso negado: apenas o criador do card, Gerente ou PO podem editar este card",
+      });
+    }
+
     // Validação: Prioridade
     if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
       return res.status(400).json({
@@ -366,6 +377,16 @@ export const excluirCard = async (req, res) => {
     if (!membro) {
       return res.status(403).json({
         error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isPO = membro.perfil === "PO";
+    const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
+
+    if (!isGerente && !isPO && !isCriador) {
+      return res.status(403).json({
+        error: "Acesso negado: apenas o criador do card, Gerente ou PO podem excluir este card",
       });
     }
 

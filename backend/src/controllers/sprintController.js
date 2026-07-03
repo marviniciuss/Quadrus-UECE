@@ -37,6 +37,20 @@ export const criarSprint = async (req, res) => {
       });
     }
 
+    // Validação: Não permitir criar mais de uma sprint planejada
+    const sprintPlanejada = await prisma.sprint.findFirst({
+      where: {
+        id_projeto: id,
+        status: "PLANEJAMENTO",
+      },
+    });
+
+    if (sprintPlanejada) {
+      return res.status(400).json({
+        error: "Já existe uma sprint planejada neste projeto. Inicie-a ou conclua a ativa antes de planejar outra.",
+      });
+    }
+
     // Validação de datas
     if (data_inicio && data_fim) {
       if (new Date(data_fim) < new Date(data_inicio)) {

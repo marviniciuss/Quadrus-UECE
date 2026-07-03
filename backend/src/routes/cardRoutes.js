@@ -22,6 +22,7 @@ router.get("/cards/:id", verifyFirebaseToken, buscarCard);
 
 // Atualizar card
 router.put("/cards/:id", verifyFirebaseToken, atualizarCard);
+router.patch("/cards/:id", verifyFirebaseToken, atualizarCard);
 
 // Excluir card
 router.delete("/cards/:id", verifyFirebaseToken, excluirCard);

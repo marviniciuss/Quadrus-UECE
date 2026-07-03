@@ -428,14 +428,36 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   };
 
   const handleDeleteAttachment = async (anexoId) => {
-    if (!selectedCard) return;
     try {
       await api.delete(`/api/anexos/${anexoId}`);
-      await reloadCardDetail(selectedCard.id_card);
+      setSelectedCard(prev => ({
+        ...prev,
+        anexos: (prev.anexos || []).filter(a => a.id_anexo !== anexoId)
+      }));
       showToast("Anexo removido.", "success");
     } catch (err) {
       console.error("Erro ao deletar anexo:", err);
       showToast("Erro ao remover anexo.", "error");
+    }
+  };
+
+  const handleDeleteCard = async () => {
+    if (!selectedCard) return;
+    if (!window.confirm("Tem certeza que deseja excluir esta atividade definitivamente?")) return;
+
+    try {
+      await api.delete(`/api/cards/${selectedCard.id_card}`);
+      showToast("Atividade excluída com sucesso.", "success");
+      onClose();
+      // Atualizar o projeto para remover o card da lista
+      const updatedProject = {
+        ...project,
+        cards: (project.cards || []).filter(c => c.id_card !== selectedCard.id_card)
+      };
+      onUpdateProject(updatedProject);
+    } catch (err) {
+      console.error("Erro ao excluir card:", err);
+      showToast("Erro ao excluir atividade.", "error");
     }
   };
 
@@ -492,6 +514,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const isPO = meuMembro?.perfil === 'PO';
   const isGerente = meuMembro?.perfil === 'GERENTE' || meuMembro?.perfil === 'ADMIN';
   const canManagePoker = isPO || isGerente;
+  const canEditOrDelete = isGerente || isPO || !selectedCard.id_criador || selectedCard.id_criador === meuMembro?.id_usuario;
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-700">
@@ -510,19 +533,30 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            {canEditOrDelete && (
+              <button
+                onClick={handleDeleteCard}
+                className="p-1.5 text-rose-500 hover:text-rose-750 hover:bg-rose-50 rounded-lg transition-colors"
+                title="Excluir Atividade"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col md:flex-row gap-8">
           
           {/* Coluna Esquerda: Descrição, Cenários, Discussão */}
-          <div className="flex-1 space-y-8 min-w-0">
+          <div className="flex-1 space-y-8 min-w-0 pb-8">
             
             {/* Título (Editável inline) */}
             <div className="space-y-1.5">
@@ -555,12 +589,14 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                   <h2 className="text-xl font-extrabold text-slate-800 leading-snug">
                     {selectedCard.titulo}
                   </h2>
-                  <button
-                    onClick={() => { setTempTitle(selectedCard.titulo); setEditingTitle(true); }}
-                    className="p-1 text-slate-400 hover:text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Edit size={14} />
-                  </button>
+                  {canEditOrDelete && (
+                    <button
+                      onClick={() => { setTempTitle(selectedCard.titulo); setEditingTitle(true); }}
+                      className="p-1 text-slate-400 hover:text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Edit size={14} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -569,7 +605,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Descrição</h3>
-                {!isEditingDescription && (
+                {!isEditingDescription && canEditOrDelete && (
                   <button
                     onClick={() => { setNewDescriptionText(parsed.descriptionText); setIsEditingDescription(true); }}
                     className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
@@ -669,7 +705,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
           </div>
 
           {/* Coluna Direita: Atributos, Planning Poker, Anexos */}
-          <div className="w-full md:w-[320px] shrink-0 space-y-6">
+          <div className="w-full md:w-[320px] shrink-0 space-y-6 pb-8">
             
             {/* Planning Poker */}
             <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4">
@@ -903,7 +939,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               <select
                 value={selectedCard.id_responsavel || ''}
                 onChange={(e) => handleUpdateCardField('id_responsavel', e.target.value || null)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold"
+                disabled={!canEditOrDelete}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 <option value="">Ninguém atribuído</option>
                 {project.membros?.map(m => (
@@ -920,7 +957,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               <select
                 value={selectedCard.prioridade}
                 onChange={(e) => handleUpdateCardField('prioridade', e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold"
+                disabled={!canEditOrDelete}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 <option value="BAIXA">BAIXA</option>
                 <option value="MEDIA">MÉDIA</option>
@@ -937,12 +975,12 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                   return (
                     <button
                       key={et.id_etiqueta}
-                      onClick={() => handleToggleCardEtiqueta(et.id_etiqueta)}
+                      onClick={() => canEditOrDelete && handleToggleCardEtiqueta(et.id_etiqueta)}
                       className={`px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${
                         isSelected
                           ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
                           : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
-                      }`}
+                      } ${!canEditOrDelete ? 'opacity-75 cursor-not-allowed' : ''}`}
                     >
                       {et.nome}
                     </button>
@@ -973,12 +1011,14 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                         {anexo.nome_arquivo}
                       </a>
                     </div>
-                    <button
-                      onClick={() => handleDeleteAttachment(anexo.id_anexo)}
-                      className="text-slate-400 hover:text-rose-600 p-0.5 rounded"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {canEditOrDelete && (
+                      <button
+                        onClick={() => handleDeleteAttachment(anexo.id_anexo)}
+                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 ))}
                 {(!selectedCard.anexos || selectedCard.anexos.length === 0) && (
@@ -987,62 +1027,65 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               </div>
 
               {/* Form para Adicionar Anexo */}
-              {addingAttachment ? (
-                <div className="space-y-2 mt-3 pt-3 border-t border-slate-200 text-left">
-                  <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase">Nome do link</label>
-                    <input
-                      type="text"
-                      value={newAttachmentName}
-                      onChange={(e) => setNewAttachmentName(e.target.value)}
-                      placeholder="Ex: Documento de Requisitos"
-                      className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs focus:outline-none focus:border-[#320066] text-slate-700"
-                    />
+              {canEditOrDelete && (
+                addingAttachment ? (
+                  <div className="space-y-2 mt-3 pt-3 border-t border-slate-200 text-left">
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase">Nome do link</label>
+                      <input
+                        type="text"
+                        value={newAttachmentName}
+                        onChange={(e) => setNewAttachmentName(e.target.value)}
+                        placeholder="Ex: Documento de Requisitos"
+                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs focus:outline-none focus:border-[#320066] text-slate-700"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[9px] font-bold text-slate-400 uppercase">Endereço (URL)</label>
+                      <input
+                        type="text"
+                        value={newAttachmentUrl}
+                        onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                        placeholder="Ex: google.com"
+                        className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs focus:outline-none focus:border-[#320066] text-slate-700"
+                      />
+                    </div>
+                    <div className="flex gap-1.5 justify-end mt-1">
+                      <button
+                        onClick={() => { setAddingAttachment(false); setNewAttachmentName(''); setNewAttachmentUrl(''); }}
+                        className="px-2.5 py-1 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-semibold"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleAddAttachment}
+                        className="px-3 py-1 bg-[#320066] hover:bg-[#26004d] text-white rounded-lg text-[10px] font-bold"
+                      >
+                        Salvar Link
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="block text-[9px] font-bold text-slate-400 uppercase">Endereço (URL)</label>
-                    <input
-                      type="text"
-                      value={newAttachmentUrl}
-                      onChange={(e) => setNewAttachmentUrl(e.target.value)}
-                      placeholder="Ex: google.com"
-                      className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs focus:outline-none focus:border-[#320066] text-slate-700"
-                    />
-                  </div>
-                  <div className="flex gap-1.5 justify-end mt-1">
-                    <button
-                      onClick={() => { setAddingAttachment(false); setNewAttachmentName(''); setNewAttachmentUrl(''); }}
-                      className="px-2.5 py-1 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-semibold"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleAddAttachment}
-                      className="px-3 py-1 bg-[#320066] hover:bg-[#26004d] text-white rounded-lg text-[10px] font-bold"
-                    >
-                      Salvar Link
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setAddingAttachment(true)}
-                  className="w-full mt-2 flex items-center justify-center gap-1.5 border border-dashed border-slate-200 hover:border-slate-350 hover:bg-white text-slate-500 text-[11px] py-2 rounded-xl font-bold transition-all"
-                >
-                  <Plus size={12} />
-                  Adicionar Item
-                </button>
+                ) : (
+                  <button
+                    onClick={() => setAddingAttachment(true)}
+                    className="w-full mt-2 flex items-center justify-center gap-1.5 border border-dashed border-slate-200 hover:border-slate-350 hover:bg-white text-slate-500 text-[11px] py-2 rounded-xl font-bold transition-all"
+                  >
+                    <Plus size={12} />
+                    Adicionar Item
+                  </button>
+                )
               )}
             </div>
 
             {/* Sinalizar Atraso */}
             <button
               onClick={() => handleUpdateCardField('em_risco', !selectedCard.em_risco)}
+              disabled={!canEditOrDelete}
               className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${
                 selectedCard.em_risco 
                   ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50' 
                   : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/10'
-              }`}
+              } disabled:opacity-75 disabled:cursor-not-allowed`}
             >
               <AlertTriangle size={14} />
               {selectedCard.em_risco ? 'Remover Sinal de Atraso' : 'Sinalizar Atraso'}

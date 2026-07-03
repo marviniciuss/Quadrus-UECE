@@ -12,6 +12,7 @@ import {
   Plus,
   Search,
   Filter,
+  Lock,
   MessageSquare,
   Paperclip,
   AlertTriangle,
@@ -191,6 +192,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const [sprintClosingMoves, setSprintClosingMoves] = useState({}); // { [id_card]: 'left' | 'right' }
   const [isBacklogModalOpen, setIsBacklogModalOpen] = useState(false);
   const [isFinishingSprint, setIsFinishingSprint] = useState(false);
+  const [migratedCardIds, setMigratedCardIds] = useState([]);
+  const [isClosingFlowStep2, setIsClosingFlowStep2] = useState(false);
 
   // Sprint Creation Form
   const [newSprintNome, setNewSprintNome] = useState('');
@@ -360,6 +363,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
           if (prev && prev !== 'backlog' && res.data.some(s => s.id_sprint === prev)) {
             return prev;
           }
+          if (res.data.length > 0) {
+            return res.data[0].id_sprint;
+          }
           return 'backlog';
         });
       }
@@ -373,6 +379,91 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   useEffect(() => {
     fetchSprints();
   }, [project.id_projeto, fetchSprints]);
+
+  const refreshProject = async () => {
+    try {
+      const res = await api.get(`/api/projetos/${project.id_projeto}`);
+      onUpdateProject(res.data);
+    } catch (err) {
+      console.error('Erro ao atualizar projeto:', err);
+    }
+  };
+
+  const getNextSprintName = () => {
+    let maxNum = 0;
+    sprints.forEach(s => {
+      const match = s.nome.match(/^Sprint (\d+)$/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) {
+          maxNum = num;
+        }
+      }
+    });
+    return `Sprint ${maxNum + 1}`;
+  };
+
+  const isOutsideSprintPeriod = () => {
+    const activeSprint = sprints.find(s => s.status === 'ATIVA');
+    if (!activeSprint) return false;
+    if (!activeSprint.data_inicio || !activeSprint.data_fim) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const start = new Date(activeSprint.data_inicio);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(activeSprint.data_fim);
+    end.setHours(0, 0, 0, 0);
+
+    return today < start || today > end;
+  };
+
+  const formatSprintText = (sprint) => {
+    if (!sprint) return '';
+    if (!sprint.data_inicio || !sprint.data_fim) {
+      return `${sprint.nome}${sprint.status === 'ATIVA' ? ' (Atual)' : ''}`;
+    }
+    // Usar UTC ou o fuso horário local corretamente (evitando mudança de dia por fuso)
+    const parseLocalDate = (dateStr) => {
+      const parts = dateStr.split('T')[0].split('-');
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
+    const start = parseLocalDate(sprint.data_inicio);
+    const end = parseLocalDate(sprint.data_fim);
+    
+    const pad = (n) => String(n).padStart(2, '0');
+    
+    const startStr = `${pad(start.getDate())}/${pad(start.getMonth() + 1)}/${String(start.getFullYear()).slice(-2)}`;
+    const endStr = `${pad(end.getDate())}/${pad(end.getMonth() + 1)}/${String(end.getFullYear()).slice(-2)}`;
+    
+    return `${sprint.nome} - ${startStr} a ${endStr}${sprint.status === 'ATIVA' ? ' (Atual)' : ''}`;
+  };
+
+  const formatTerminationText = (dateStr) => {
+    if (!dateStr) return 'termina hoje';
+    
+    const parseLocalDate = (dateStr) => {
+      const parts = dateStr.split('T')[0].split('-');
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    };
+    
+    const endDate = parseLocalDate(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
+    if (endDate.getTime() === today.getTime()) {
+      return 'termina hoje';
+    } else if (endDate.getTime() < today.getTime()) {
+      return 'já terminou';
+    } else {
+      const pad = (n) => String(n).padStart(2, '0');
+      const dateFormatted = `${pad(endDate.getDate())}/${pad(endDate.getMonth() + 1)}/${String(endDate.getFullYear()).slice(-2)}`;
+      return `termina em ${dateFormatted}`;
+    }
+  };
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault();
@@ -523,6 +614,11 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
 
   const handleDrop = (e, targetStatus) => {
     e.preventDefault();
+    if (isOutsideSprintPeriod()) {
+      alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
+      setActiveTab('sprint');
+      return;
+    }
     const cardId = e.dataTransfer.getData('text/plain');
     if (!cardId) return;
 
@@ -601,6 +697,11 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
 
   // Mover cartão via clique (acessibilidade / mobile-friendly)
   const moveCard = (cardId, targetStatus) => {
+    if (isOutsideSprintPeriod()) {
+      alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
+      setActiveTab('sprint');
+      return;
+    }
     const cardObj = (project.cards || []).find(c => c.id_card === cardId);
     if (!cardObj || cardObj.id_coluna === targetStatus) return;
 
@@ -995,10 +1096,25 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     }
   };
 
+  const handleNewActivityClick = () => {
+    const hasActiveSprint = sprints.some(s => s.status === 'ATIVA');
+    if (!hasActiveSprint) {
+      alert("Você precisa ter uma sprint ativa para criar uma atividade. Redirecionando para a tela de criação de sprint.");
+      setActiveTab('sprint');
+      return;
+    }
+    if (isOutsideSprintPeriod()) {
+      alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
+      setActiveTab('sprint');
+      return;
+    }
+    setIsNewCardModalOpen(true);
+  };
+
   // ================= GERENCIAMENTO DE SPRINTS =================
   const handleCreateSprint = async (e) => {
     e.preventDefault();
-    if (!newSprintNome.trim()) return;
+    const generatedName = getNextSprintName();
 
     if (newSprintDataInicio && newSprintDataFim) {
       if (new Date(newSprintDataFim) < new Date(newSprintDataInicio)) {
@@ -1010,19 +1126,40 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     setCreatingSprint(true);
     try {
       const res = await api.post(`/api/projetos/${project.id_projeto}/sprints`, {
-        nome: newSprintNome,
+        nome: generatedName,
         data_inicio: newSprintDataInicio || null,
         data_fim: newSprintDataFim || null,
         objetivo: newSprintObjetivo || null,
       });
 
-      setSprints(prev => [...prev, res.data]);
-      showToast('Sprint criada com sucesso!', 'success');
+      const createdSprint = res.data;
+      const hasActive = sprints.some(s => s.status === 'ATIVA');
+      let finalSprint = createdSprint;
+
+      if (!hasActive) {
+        const startRes = await api.patch(`/api/sprints/${createdSprint.id_sprint}/iniciar`);
+        finalSprint = startRes.data;
+        showToast(`Sprint criada e iniciada automaticamente como ${generatedName}!`, 'success');
+        setSelectedSprintId(finalSprint.id_sprint);
+      } else {
+        showToast(`Sprint ${generatedName} planejada com sucesso!`, 'success');
+      }
+
+      if (migratedCardIds.length > 0) {
+        await api.post(`/api/sprints/${finalSprint.id_sprint}/migrar-cards`, { cardIds: migratedCardIds });
+        setMigratedCardIds([]);
+      }
+
+      setSprints(prev => [...prev.filter(s => s.id_sprint !== finalSprint.id_sprint), finalSprint]);
 
       setNewSprintNome('');
       setNewSprintDataInicio('');
       setNewSprintDataFim('');
       setNewSprintObjetivo('');
+
+      await refreshProject();
+      alert("Sprint criada com sucesso!");
+      setIsClosingFlowStep2(false);
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.error || 'Erro ao criar sprint.', 'error');
@@ -1038,8 +1175,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       setSelectedSprintId(sprintId);
       showToast('Sprint iniciada com sucesso!', 'success');
 
-      // Update cards in project to synchronize status
-      if (onProjectAction) onProjectAction();
+      await refreshProject();
+      setActiveTab('board');
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.error || 'Erro ao iniciar sprint.', 'error');
@@ -1072,8 +1209,13 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       setIsBacklogModalOpen(false);
       showToast('Sprint concluída com sucesso!', 'success');
 
-      if (onProjectAction) onProjectAction();
+      // Pré-definir data de início para hoje
+      const todayStr = new Date().toISOString().split('T')[0];
+      setNewSprintDataInicio(todayStr);
+
+      await refreshProject();
       fetchSprints();
+      setIsClosingFlowStep2(true);
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.error || 'Erro ao finalizar sprint.', 'error');
@@ -1083,14 +1225,17 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   };
 
   const handleFinishSprint = async (sprintId) => {
-    // Mantendo caso seja usado em outros lugares, embora o fluxo principal vá usar handleFinishSprintAction
     try {
       const res = await api.patch(`/api/sprints/${sprintId}/finalizar`);
       setSprints(prev => prev.map(s => s.id_sprint === sprintId ? res.data : s));
       showToast('Sprint concluída com sucesso!', 'success');
 
-      if (onProjectAction) onProjectAction();
+      const todayStr = new Date().toISOString().split('T')[0];
+      setNewSprintDataInicio(todayStr);
+
+      await refreshProject();
       fetchSprints();
+      setIsClosingFlowStep2(true);
     } catch (err) {
       console.error(err);
       showToast(err.response?.data?.error || 'Erro ao finalizar sprint.', 'error');
@@ -1321,44 +1466,46 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
 
               <div className="h-8 w-px bg-slate-200 shrink-0" />
 
-              {/* Dropdown de Sprint */}
-              <div className="relative shrink-0 w-36 sm:w-44">
+              {/* Dropdown de Sprint ou Botão Criar Sprint */}
+              {sprints.length === 0 ? (
                 <button
-                  onClick={() => setSprintDropdownOpen(!sprintDropdownOpen)}
-                  className="flex items-center justify-between w-full gap-2 px-4 py-2.5 rounded-xl bg-[#320066] hover:bg-[#26004d] text-white font-bold text-xs border border-[#26004d] transition-all active:scale-95 uppercase tracking-wide shadow-sm"
+                  onClick={() => setActiveTab('sprint')}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#320066] hover:bg-[#26004d] text-white font-bold text-xs border border-[#26004d] transition-all active:scale-95 uppercase tracking-wide shadow-sm shrink-0 w-36 sm:w-44"
                 >
-                  <span className="truncate">{selectedSprintId === 'backlog' ? 'BACKLOG' : (sprints.find(s => s.id_sprint === selectedSprintId)?.nome || 'SELECIONAR SPRINT')}</span>
-                  <ChevronDown size={12} className={`transition-transform duration-200 shrink-0 ${sprintDropdownOpen ? 'rotate-180' : ''}`} />
+                  <Plus size={14} className="shrink-0" />
+                  <span className="truncate">Criar Sprint</span>
                 </button>
-
-                {sprintDropdownOpen && (
-                  <div className="absolute right-0 lg:left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-left animate-fade-in">
-                    <button
-                      onClick={() => {
-                        setSelectedSprintId('backlog');
-                        setSprintDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === 'backlog' ? 'text-[#320066] bg-brand-50/50' : 'text-slate-700'
-                        }`}
-                    >
-                      BACKLOG
-                    </button>
-                    {sprints.map((sprint) => (
-                      <button
-                        key={sprint.id_sprint}
-                        onClick={() => {
-                          setSelectedSprintId(sprint.id_sprint);
-                          setSprintDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === sprint.id_sprint ? 'text-[#320066] bg-brand-50/50' : 'text-slate-700'
-                          }`}
-                      >
-                        {sprint.nome} {sprint.status === 'ATIVA' && ' (Atual)'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="relative shrink-0 w-36 sm:w-44">
+                  <button
+                    onClick={() => setSprintDropdownOpen(!sprintDropdownOpen)}
+                    className="flex items-center justify-between w-full gap-2 px-4 py-2.5 rounded-xl bg-[#320066] hover:bg-[#26004d] text-white font-bold text-xs border border-[#26004d] transition-all active:scale-95 uppercase tracking-wide shadow-sm"
+                  >
+                    <span className="truncate">
+                      {selectedSprintId === 'backlog' ? 'BACKLOG' : formatSprintText(sprints.find(s => s.id_sprint === selectedSprintId))}
+                    </span>
+                    <ChevronDown size={12} className={`transition-transform duration-200 shrink-0 ${sprintDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+ 
+                  {sprintDropdownOpen && (
+                    <div className="absolute right-0 lg:left-0 mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-30 text-left animate-fade-in">
+                      {sprints.map((sprint) => (
+                        <button
+                          key={sprint.id_sprint}
+                          onClick={() => {
+                            setSelectedSprintId(sprint.id_sprint);
+                            setSprintDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors ${selectedSprintId === sprint.id_sprint ? 'text-[#320066] bg-brand-50/50' : 'text-slate-700'
+                            }`}
+                        >
+                          {formatSprintText(sprint)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="h-8 w-px bg-slate-200 shrink-0" />
 
@@ -1527,7 +1674,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     {/* Botão Nova Atividade na primeira coluna */}
                     {col.id === columns[0]?.id && (
                       <button
-                        onClick={() => setIsNewCardModalOpen(true)}
+                        onClick={handleNewActivityClick}
                         className="mb-4 w-full flex items-center justify-center gap-2 bg-[#320066] hover:bg-[#26004d] text-white font-extrabold text-xs py-3 rounded-xl transition-all shadow-md shadow-brand-500/10 active:scale-[0.98]"
                       >
                         <Plus size={16} />
@@ -1549,7 +1696,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               draggable
                               onDragStart={(e) => handleDragStart(e, card.id_card)}
                               onDragEnd={handleDragEnd}
-                              onClick={() => setSelectedCardId(card.id_card)}
+                              onClick={() => {
+                                if (isOutsideSprintPeriod()) {
+                                  alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
+                                  setActiveTab('sprint');
+                                  return;
+                                }
+                                setSelectedCardId(card.id_card);
+                              }}
                               className="group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4"
                               style={{ borderLeftColor: col.colorHex || '#64748b' }}
                             >
@@ -1704,183 +1858,53 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
           </>
         ) : activeTab === 'sprint' ? (
           /* ================= TELA PLANEJAMENTO DE SPRINT E CICLOS ================= */
-          <div className="flex flex-col w-full text-left">
-            {/* Header da Tela */}
-            <div className="text-left mb-6 md:mb-8">
-              <h1 className="text-2xl font-extrabold text-slate-800">Planejamento de Sprint e Ciclos</h1>
-              <p className="text-slate-500 text-sm mt-1">Gerencie a velocidade da sua engenharia. Inicialize novos ciclos e realize transições limpas entre sprints com a transferência automática de trabalhos incompletos.</p>
-            </div>
+          (() => {
+            const activeSprint = sprints.find(s => s.status === 'ATIVA');
+            const plannedSprint = sprints.find(s => s.status === 'PLANEJAMENTO');
+            const showClosingFlow = activeSprint || isClosingFlowStep2;
 
-            {/* Grid Principal */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left items-start">
-
-              {/* Esquerda: Criar Sprint */}
-              <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                  <Calendar className="text-brand-600" size={20} />
-                  <h2 className="text-md font-extrabold text-slate-800 uppercase tracking-wider">Criar Sprint</h2>
+            return (
+              <div className="flex flex-col w-full text-left">
+                {/* Header da Tela */}
+                <div className="text-left mb-6 md:mb-8">
+                  <h1 className="text-2xl font-extrabold text-slate-800">Planejamento de Sprint e Ciclos</h1>
+                  <p className="text-slate-500 text-sm mt-1">Gerencie a velocidade da sua engenharia. Inicialize novos ciclos e realize transições limpas entre sprints com a transferência automática de trabalhos incompletos.</p>
                 </div>
 
-                <form onSubmit={handleCreateSprint} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Nome da Sprint</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Sprint 24 - Orion Project"
-                      value={newSprintNome}
-                      onChange={(e) => setNewSprintNome(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
-                    />
-                  </div>
+                {/* Grid Principal */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left items-stretch">
+                  
+                  {showClosingFlow ? (
+                    // Caso haja sprint ativa ou estejamos no passo 2 do encerramento (migração ativa):
+                    // Coluna da Esquerda (lg:col-span-2): Encerrar Sprint
+                    // Coluna da Direita (lg:col-span-1): Criar Sprint
+                    <>
+                      {/* Esquerda: Encerrar Sprint */}
+                      <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[400px] flex flex-col justify-between h-full">
+                        {activeSprint ? (() => {
+                          const unfinishedCards = (activeSprint.cards || []).filter(c => c.status !== 'CONCLUIDO' && c.id_coluna !== 'CONCLUIDO');
+                          const finishedCards = (activeSprint.cards || []).filter(c => c.status === 'CONCLUIDO' || c.id_coluna === 'CONCLUIDO');
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Início</label>
-                      <input
-                        type="date"
-                        value={newSprintDataInicio}
-                        onChange={(e) => setNewSprintDataInicio(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-slate-700"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Término</label>
-                      <input
-                        type="date"
-                        value={newSprintDataFim}
-                        onChange={(e) => setNewSprintDataFim(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-slate-700"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Objetivo da Sprint</label>
-                    <textarea
-                      rows="3"
-                      placeholder="Defina o objetivo primário da sprint..."
-                      value={newSprintObjetivo}
-                      onChange={(e) => setNewSprintObjetivo(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 resize-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={creatingSprint}
-                    className="w-full bg-[#320066] hover:bg-[#25004d] text-white font-bold text-sm py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {creatingSprint && <Loader2 size={16} className="animate-spin" />}
-                    Criar Sprint
-                  </button>
-                </form>
-              </div>
-
-              {/* Direita: Encerrar / Transição de Sprint */}
-              <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[400px] flex flex-col justify-between">
-                {(() => {
-                  const activeSprint = sprints.find(s => s.status === 'ATIVA');
-                  const nextSprint = sprints.find(s => s.status === 'PLANEJAMENTO');
-
-                  if (activeSprint) {
-                    const unfinishedCards = (activeSprint.cards || []).filter(c => c.status !== 'CONCLUIDO');
-                    const finishedCards = (activeSprint.cards || []).filter(c => c.status === 'CONCLUIDO');
-                    const nextSprintCards = nextSprint ? (nextSprint.cards || []) : [];
-
-                    return (
-                      <div className="flex flex-col h-full justify-between gap-6">
-                        <div>
-                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                            <div>
-                              <h2 className="text-md font-extrabold text-slate-800">Encerrar Sprint</h2>
-                              <p className="text-slate-500 text-xs mt-0.5">A {activeSprint.nome} termina hoje. Tarefas incompletas serão migradas.</p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col md:flex-row items-stretch gap-4 mt-4">
-                            {/* Coluna Sprint Atual */}
-                            <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4">
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wide mb-3">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
-                                {activeSprint.nome} (Atual)
-                              </span>
-                              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                                {(() => {
-                                  let leftCards = unfinishedCards.filter(c => sprintClosingMoves[c.id_card] !== 'right');
-                                  leftCards = [...leftCards, ...nextSprintCards.filter(c => sprintClosingMoves[c.id_card] === 'left')];
-
-                                  return leftCards.map(card => (
-                                    <div key={card.id_card} onClick={() => setSprintClosingMoves(prev => ({ ...prev, [card.id_card]: 'right' }))} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
-                                      <div className="flex justify-between items-center gap-2 mb-1">
-                                        <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                          card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                            'bg-slate-50 text-slate-600 border border-slate-100'
-                                          }`}>
-                                          {card.prioridade}
-                                        </span>
-                                      </div>
-                                      <p className="font-bold text-slate-700">{card.titulo}</p>
-                                    </div>
-                                  ));
-                                })()}
-                                {finishedCards.map(card => (
-                                  <div key={card.id_card} className="bg-slate-50/80 border border-slate-200/40 rounded-lg p-2.5 text-xs opacity-60 text-left">
-                                    <p className="font-semibold text-slate-400 line-through">{card.titulo}</p>
-                                    <span className="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 mt-1.5 inline-block">
-                                      CONCLUÍDO
-                                    </span>
-                                  </div>
-                                ))}
-                                {activeSprint.cards?.length === 0 && (
-                                  <p className="text-slate-400 text-xs py-4 text-center">Nenhum card nesta sprint</p>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Botão de Migração */}
-                            <div className="flex flex-row md:flex-col items-center justify-center gap-2 shrink-0 self-center">
-                              <button
-                                onClick={() => {
-                                  let currentLeftCards = unfinishedCards.filter(c => sprintClosingMoves[c.id_card] !== 'right');
-                                  currentLeftCards = [...currentLeftCards, ...nextSprintCards.filter(c => sprintClosingMoves[c.id_card] === 'left')];
-                                  
-                                  if (currentLeftCards.length === 0) return;
-                                  
-                                  const newMoves = { ...sprintClosingMoves };
-                                  currentLeftCards.forEach(c => {
-                                    newMoves[c.id_card] = 'right';
-                                  });
-                                  setSprintClosingMoves(newMoves);
-                                }}
-                                disabled={(() => {
-                                  let currentLeftCards = unfinishedCards.filter(c => sprintClosingMoves[c.id_card] !== 'right');
-                                  currentLeftCards = [...currentLeftCards, ...nextSprintCards.filter(c => sprintClosingMoves[c.id_card] === 'left')];
-                                  return currentLeftCards.length === 0;
-                                })()}
-                                className="p-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-600 rounded-full transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-0.5 shadow-sm"
-                                title="Migrar tarefas pendentes para a próxima sprint"
-                              >
-                                <ChevronsRight size={18} />
-                                <span className="text-[8px] font-extrabold uppercase tracking-wider">MIGRAR</span>
-                              </button>
-                            </div>
-
-                            {/* Coluna Sprint Próxima */}
-                            <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between">
+                          return (
+                            <div className="flex flex-col h-full justify-between gap-6">
                               <div>
-                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                                  {nextSprint ? `${nextSprint.nome} (Próxima)` : 'Próxima Sprint'}
-                                </span>
-                                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                                  {(() => {
-                                    let rightCards = nextSprintCards.filter(c => sprintClosingMoves[c.id_card] !== 'left');
-                                    rightCards = [...rightCards, ...unfinishedCards.filter(c => sprintClosingMoves[c.id_card] === 'right')];
-                                    
-                                    if (rightCards.length > 0) {
-                                      return rightCards.map(card => (
-                                        <div key={card.id_card} onClick={() => setSprintClosingMoves(prev => ({ ...prev, [card.id_card]: 'left' }))} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
+                                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                                  <div>
+                                    <h2 className="text-md font-extrabold text-slate-800">Encerrar Sprint</h2>
+                                    <p className="text-slate-500 text-xs mt-0.5">A {activeSprint.nome} {formatTerminationText(activeSprint.data_fim)}. Escolha quais tarefas pendentes serão migradas para a próxima sprint.</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row items-stretch gap-4 mt-4">
+                                  {/* Coluna Sprint Atual */}
+                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4">
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wide mb-3">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
+                                      {activeSprint.nome} (Atual) - Pendentes
+                                    </span>
+                                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                      {unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).map(card => (
+                                        <div key={card.id_card} onClick={() => setMigratedCardIds(prev => [...prev, card.id_card])} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
                                           <div className="flex justify-between items-center gap-2 mb-1">
                                             <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
                                               card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
@@ -1891,161 +1915,419 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                           </div>
                                           <p className="font-bold text-slate-700">{card.titulo}</p>
                                         </div>
-                                      ));
-                                    } else {
-                                      return (
-                                        <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
-                                          <Calendar size={20} className="mb-1" />
-                                          <p className="text-[10px] font-semibold">Nenhuma tarefa na próxima sprint</p>
-                                        </div>
-                                      );
-                                    }
-                                  })()}
+                                      ))}
+                                      {unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).length === 0 && (
+                                        <p className="text-slate-400 text-xs py-4 text-center">Nenhum card pendente nesta sprint</p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Botão de Migração */}
+                                  <div className="flex flex-row md:flex-col items-center justify-center gap-2 shrink-0 self-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const unmigrated = unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).map(c => c.id_card);
+                                        setMigratedCardIds(prev => [...prev, ...unmigrated]);
+                                      }}
+                                      disabled={unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).length === 0}
+                                      className="p-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-600 rounded-full transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-0.5 shadow-sm font-bold"
+                                      title="Migrar todas para a próxima sprint"
+                                    >
+                                      <ChevronsRight size={18} />
+                                      <span className="text-[8px] font-extrabold uppercase tracking-wider">MIGRAR</span>
+                                    </button>
+                                  </div>
+
+                                  {/* Coluna Sprint Próxima */}
+                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between">
+                                    <div>
+                                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                        Tarefas a Migrar (Próxima Sprint)
+                                      </span>
+                                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                        {migratedCardIds.length > 0 ? (
+                                          unfinishedCards.filter(c => migratedCardIds.includes(c.id_card)).map(card => (
+                                            <div key={card.id_card} onClick={() => setMigratedCardIds(prev => prev.filter(id => id !== card.id_card))} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
+                                              <div className="flex justify-between items-center gap-2 mb-1">
+                                                <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                                  card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                    'bg-slate-50 text-slate-600 border border-slate-100'
+                                                  }`}>
+                                                  {card.prioridade}
+                                                </span>
+                                              </div>
+                                              <p className="font-bold text-slate-700">{card.titulo}</p>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                                            <Calendar size={20} className="mb-1" />
+                                            <p className="text-[10px] font-semibold">Nenhuma tarefa marcada para migrar</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div
+                                      onClick={() => {
+                                        setIsBacklogModalOpen(true);
+                                      }}
+                                      className="border border-dashed border-slate-300 rounded-lg p-3 text-center text-[10px] font-bold text-slate-400 mt-4 bg-white/50 cursor-pointer hover:border-brand-500 hover:text-brand-600 transition-all select-none"
+                                    >
+                                      Adicionar mais itens do backlog...
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                              <div
-                                onClick={() => {
-                                  setIsBacklogModalOpen(true);
-                                }}
-                                className="border border-dashed border-slate-300 rounded-lg p-3 text-center text-[10px] font-bold text-slate-400 mt-4 bg-white/50 cursor-pointer hover:border-brand-500 hover:text-brand-600 transition-all select-none"
-                              >
-                                Adicionar mais itens do backlog...
-                              </div>
-                            </div>
-                          </div>
-                        </div>
 
-                        {/* Modal para Adicionar do Backlog */}
-                        {isBacklogModalOpen && (
-                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-                            <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 flex flex-col max-h-[80vh]">
-                              <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                                  <FolderKanban size={20} className="text-brand-600" />
-                                  Itens do Backlog
-                                </h3>
-                                <button onClick={() => setIsBacklogModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                                  <X size={20} />
-                                </button>
-                              </div>
-                              <div className="flex-1 overflow-y-auto pr-1 space-y-2">
-                                {(() => {
-                                  const backlogCards = (project.cards || []).filter(c => !c.id_sprint && c.status !== 'CONCLUIDO');
-                                  if (backlogCards.length === 0) {
-                                    return <p className="text-sm text-slate-500 text-center py-6">Nenhuma tarefa no backlog.</p>;
-                                  }
-                                  return backlogCards.map(card => (
-                                    <div key={card.id_card} onClick={() => { setSelectedCardId(card.id_card); setIsBacklogModalOpen(false); }} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-brand-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                                      <div>
-                                        <p className="text-sm font-bold text-slate-700">{card.titulo}</p>
-                                        <p className="text-xs text-slate-500 mt-1">Prioridade: {card.prioridade}</p>
-                                      </div>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSprintClosingMoves(prev => ({ ...prev, [card.id_card]: 'right' }));
-                                          setIsBacklogModalOpen(false);
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-bold text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
-                                      >
-                                        Adicionar
+                              {/* Modal para Adicionar do Backlog */}
+                              {isBacklogModalOpen && (
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+                                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl p-6 flex flex-col max-h-[80vh]">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+                                        <FolderKanban size={20} className="text-brand-600" />
+                                        Itens do Backlog
+                                      </h3>
+                                      <button onClick={() => setIsBacklogModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                        <X size={20} />
                                       </button>
                                     </div>
-                                  ));
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Botão Concluir/Fechar */}
-                        <div className="flex justify-end pt-4 border-t border-slate-100">
-                          <button
-                            onClick={() => handleFinishSprintAction(activeSprint, nextSprint, unfinishedCards, nextSprint ? (nextSprint.cards || []) : [])}
-                            disabled={isFinishingSprint}
-                            className="px-5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold text-xs transition-all shadow-sm active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
-                          >
-                            {isFinishingSprint ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                            Fechar Sprint Atual
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Se não houver sprint ativa
-                  return (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <Calendar className="text-slate-300 mb-3 animate-pulse" size={48} />
-                      <h3 className="text-md font-extrabold text-slate-700">Nenhuma Sprint Ativa</h3>
-                      <p className="text-slate-400 text-xs max-w-sm mt-1 leading-relaxed">
-                        Não há nenhuma sprint ativa no momento. Planeje suas tarefas e inicie uma das sprints listadas abaixo ou crie uma nova no painel ao lado.
-                      </p>
-
-                      {/* Lista de Sprints em Planejamento para Iniciar */}
-                      {sprints.filter(s => s.status === 'PLANEJAMENTO').length > 0 && (
-                        <div className="w-full mt-6 max-w-md border border-slate-100 rounded-xl p-3 bg-slate-50/50">
-                          <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-2 text-left">Sprints Planejadas:</p>
-                          <div className="space-y-2">
-                            {sprints.filter(s => s.status === 'PLANEJAMENTO').map(s => (
-                              <div key={s.id_sprint} className="bg-white border border-slate-200 rounded-lg p-3 flex items-center justify-between text-xs shadow-sm">
-                                <div className="text-left">
-                                  <p className="font-bold text-slate-800">{s.nome}</p>
-                                  {s.objetivo && <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[200px]">{s.objetivo}</p>}
+                                    <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+                                      {(() => {
+                                        const backlogCards = (project.cards || []).filter(c => !c.id_sprint && c.status !== 'CONCLUIDO');
+                                        if (backlogCards.length === 0) {
+                                          return <p className="text-sm text-slate-500 text-center py-6">Nenhuma tarefa no backlog.</p>;
+                                        }
+                                        return backlogCards.map(card => (
+                                          <div key={card.id_card} onClick={() => { setSelectedCardId(card.id_card); setIsBacklogModalOpen(false); }} className="flex items-center justify-between p-3 border border-slate-200 rounded-xl hover:border-brand-300 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                            <div>
+                                              <p className="text-sm font-bold text-slate-700">{card.titulo}</p>
+                                              <p className="text-xs text-slate-500 mt-1">Prioridade: {card.prioridade}</p>
+                                            </div>
+                                            <button 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMigratedCardIds(prev => [...prev, card.id_card]);
+                                                setIsBacklogModalOpen(false);
+                                              }}
+                                              className="px-3 py-1.5 text-xs font-bold text-white bg-[#320066] rounded-lg hover:bg-brand-700 transition-colors animate-fade-in"
+                                            >
+                                              Adicionar
+                                            </button>
+                                          </div>
+                                        ));
+                                      })()}
+                                    </div>
+                                  </div>
                                 </div>
+                              )}
+
+                              {/* Botão Concluir/Fechar */}
+                              <div className="flex justify-end pt-4 border-t border-slate-100">
                                 <button
-                                  onClick={() => handleStartSprint(s.id_sprint)}
-                                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] transition-all active:scale-95 shadow-sm"
+                                  onClick={async () => {
+                                    const unfinishedCardIds = unfinishedCards.map(c => c.id_card);
+                                    if (unfinishedCardIds.length > 0) {
+                                      await api.post(`/api/sprints/null/migrar-cards`, { cardIds: unfinishedCardIds, idProjeto: project.id_projeto });
+                                    }
+                                    await handleFinishSprintAction(activeSprint, null, unfinishedCards, []);
+                                  }}
+                                  disabled={isFinishingSprint}
+                                  className="px-5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold text-xs transition-all shadow-sm active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
                                 >
-                                  Iniciar Sprint
+                                  {isFinishingSprint ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                                  Fechar Sprint Atual
                                 </button>
                               </div>
-                            ))}
+                            </div>
+                          );
+                        })() : (
+                          // Passo 2: Sprint anterior finalizada com sucesso, aguardando criar a próxima
+                          <div className="flex flex-col items-center justify-center py-12 text-center h-full my-auto">
+                            <CheckCircle2 size={48} className="text-emerald-500 mb-4 animate-bounce" />
+                            <h3 className="text-lg font-extrabold text-slate-800">Sprint Finalizada</h3>
+                            <p className="text-slate-500 text-xs mt-2 leading-relaxed max-w-sm">
+                              A sprint anterior foi finalizada com sucesso. Configure e crie a próxima sprint no painel ao lado para concluir a transição de ciclo e migrar as tarefas pendentes.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Direita: Formulário de Criar Sprint (Habilitado apenas no passo 2) */}
+                      <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-full flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                            <Calendar className="text-[#320066]" size={20} />
+                            <h2 className="text-md font-extrabold text-slate-800 uppercase tracking-wider">Criar Sprint</h2>
+                          </div>
+
+                          <form onSubmit={handleCreateSprint} className="space-y-4">
+                            <div className="space-y-1.5">
+                              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Nome da Sprint</label>
+                              <div className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-extrabold text-slate-750 select-none">
+                                {getNextSprintName()}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Início</label>
+                                <input
+                                  type="date"
+                                  disabled={true}
+                                  value={newSprintDataInicio}
+                                  onChange={(e) => setNewSprintDataInicio(e.target.value)}
+                                  className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none transition-all text-slate-500 cursor-not-allowed"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Término</label>
+                                <input
+                                  type="date"
+                                  disabled={!isClosingFlowStep2}
+                                  value={newSprintDataFim}
+                                  onChange={(e) => setNewSprintDataFim(e.target.value)}
+                                  className={`w-full border rounded-xl py-2.5 px-4 text-sm focus:outline-none transition-all text-slate-700 ${
+                                    isClosingFlowStep2
+                                      ? 'bg-slate-50 border-slate-200 focus:border-[#320066] focus:ring-1 focus:ring-[#320066]'
+                                      : 'bg-slate-100 border-slate-200 cursor-not-allowed'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Objetivo da Sprint</label>
+                              <textarea
+                                rows="3"
+                                disabled={!isClosingFlowStep2}
+                                placeholder="Defina o objetivo primário da sprint..."
+                                value={newSprintObjetivo}
+                                onChange={(e) => setNewSprintObjetivo(e.target.value)}
+                                className={`w-full border rounded-xl py-2.5 px-4 text-sm focus:outline-none transition-all placeholder-slate-400 resize-none ${
+                                  isClosingFlowStep2
+                                    ? 'bg-slate-50 border-slate-200 focus:border-[#320066] focus:ring-1 focus:ring-[#320066]'
+                                    : 'bg-slate-100 border-slate-200 cursor-not-allowed'
+                                }`}
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={!isClosingFlowStep2 || creatingSprint}
+                              className="w-full bg-[#320066] hover:bg-[#25004d] text-white font-bold text-sm py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                            >
+                              {creatingSprint && <Loader2 size={16} className="animate-spin" />}
+                              {isClosingFlowStep2 ? 'Criar Sprint' : (
+                                <>
+                                  <Lock size={12} />
+                                  <span>CRIAR PRÓXIMA SPRINT</span>
+                                </>
+                              )}
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Caso NÃO haja sprint ativa nem estejamos no encerramento (fluxo normal inicial ou planejado)
+                    // Coluna da Esquerda (lg:col-span-1): Criar Sprint ou Sprint Planejada Info
+                    // Coluna da Direita (lg:col-span-2): Detalhes da Sprint Planejada ou Mensagem de Nenhuma Sprint Ativa
+                    <>
+                      {/* Esquerda: Painel de Planejamento */}
+                      {plannedSprint ? (
+                        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center min-h-[350px] text-center h-full justify-between">
+                          <div className="flex flex-col items-center justify-center my-auto">
+                            <Calendar className="text-[#320066]/75 mb-3" size={40} />
+                            <h3 className="text-sm font-extrabold text-slate-750 uppercase tracking-wider">Sprint Planejada</h3>
+                            <p className="text-slate-500 text-xs mt-2 leading-relaxed">
+                              Você já possui a **{plannedSprint.nome}** em planejamento. Inicie esta sprint para começar o ciclo e liberar novos planejamentos.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="lg:col-span-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm h-full flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                              <Calendar className="text-[#320066]" size={20} />
+                              <h2 className="text-md font-extrabold text-slate-800 uppercase tracking-wider">Criar Sprint</h2>
+                            </div>
+
+                            <form onSubmit={handleCreateSprint} className="space-y-4">
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Nome da Sprint</label>
+                                <div className="w-full bg-slate-100 border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-extrabold text-slate-750 select-none">
+                                  {getNextSprintName()}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Início</label>
+                                  <input
+                                    type="date"
+                                    value={newSprintDataInicio}
+                                    onChange={(e) => setNewSprintDataInicio(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#320066] focus:ring-1 focus:ring-[#320066] transition-all text-slate-700"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Término</label>
+                                  <input
+                                    type="date"
+                                    value={newSprintDataFim}
+                                    onChange={(e) => setNewSprintDataFim(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#320066] focus:ring-1 focus:ring-[#320066] transition-all text-slate-700"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Objetivo da Sprint</label>
+                                <textarea
+                                  rows="3"
+                                  placeholder="Defina o objetivo primário da sprint..."
+                                  value={newSprintObjetivo}
+                                  onChange={(e) => setNewSprintObjetivo(e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#320066] focus:ring-1 focus:ring-[#320066] transition-all placeholder-slate-400 resize-none"
+                                />
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={creatingSprint}
+                                className="w-full bg-[#320066] hover:bg-[#25004d] text-white font-bold text-sm py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                              >
+                                {creatingSprint && <Loader2 size={16} className="animate-spin" />}
+                                Criar Sprint
+                              </button>
+                            </form>
                           </div>
                         </div>
                       )}
+
+                      {/* Direita: Detalhes da Sprint Planejada */}
+                      <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[400px] flex flex-col justify-between h-full">
+                        {plannedSprint ? (() => {
+                          const todayStr = new Date().toISOString().split('T')[0];
+                          const sprintStartStr = plannedSprint.data_inicio ? new Date(plannedSprint.data_inicio).toISOString().split('T')[0] : '';
+                          const isStartToday = !sprintStartStr || sprintStartStr <= todayStr;
+
+                          return (
+                            <div className="flex flex-col items-center justify-center py-8 text-center h-full my-auto">
+                              <Calendar className="text-[#320066]/75 mb-4" size={48} />
+                              <h3 className="text-md font-extrabold text-slate-800 uppercase tracking-wider">Sprint Planejada</h3>
+                              
+                              <div className="mt-4 p-5 bg-slate-50 border border-slate-200 rounded-2xl w-full max-w-md text-left space-y-3">
+                                <div>
+                                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Nome da Sprint</span>
+                                  <p className="text-sm font-extrabold text-slate-800">{plannedSprint.nome}</p>
+                                </div>
+                                {plannedSprint.objetivo && (
+                                  <div>
+                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Objetivo</span>
+                                    <p className="text-xs text-slate-650 mt-0.5">{plannedSprint.objetivo}</p>
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Data de Início</span>
+                                    <p className="text-xs text-slate-650 font-semibold mt-0.5">
+                                      {plannedSprint.data_inicio ? new Date(plannedSprint.data_inicio).toLocaleDateString() : 'Não informada'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Data de Término</span>
+                                    <p className="text-xs text-slate-650 font-semibold mt-0.5">
+                                      {plannedSprint.data_fim ? new Date(plannedSprint.data_fim).toLocaleDateString() : 'Não informada'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-6 w-full max-w-md">
+                                {isStartToday ? (
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                      Esta sprint está programada para iniciar hoje. Clique no botão abaixo para ativá-la e começar o ciclo de trabalho.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartSprint(plannedSprint.id_sprint)}
+                                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm py-3 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
+                                    >
+                                      Iniciar Sprint
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-amber-600 font-bold leading-relaxed">
+                                      Esta sprint está agendada para iniciar em {new Date(plannedSprint.data_inicio).toLocaleDateString()}.
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartSprint(plannedSprint.id_sprint)}
+                                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm py-3 rounded-xl transition-all active:scale-[0.98] shadow-md shadow-emerald-500/10"
+                                    >
+                                      Iniciar Sprint Antecipadamente
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <div className="flex flex-col items-center justify-center py-16 text-center my-auto">
+                            <Calendar className="text-[#320066]/30 mb-3 animate-pulse" size={48} />
+                            <h3 className="text-md font-extrabold text-slate-700 uppercase tracking-wider font-semibold text-slate-400">Nenhuma Sprint Ativa</h3>
+                            <p className="text-slate-400 text-xs max-w-sm mt-1 leading-relaxed">
+                              Não há nenhuma sprint activa ou planejada no momento. Crie um novo ciclo usando o painel ao lado.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                </div>
+
+                {/* Rodapé: Métricas baseadas na Sprint Ativa */}
+                {activeSprint && (() => {
+                  const totalCards = (activeSprint.cards || []).length;
+                  const completedCards = (activeSprint.cards || []).filter(c => c.status === 'CONCLUIDO');
+                  const completedCount = completedCards.length;
+
+                  const completedPoints = completedCards.reduce((acc, c) => acc + (c.story_points || 0), 0);
+                  const unfinishedCount = totalCards - completedCount;
+                  const percentage = totalCards > 0 ? Math.round((completedCount / totalCards) * 100) : 0;
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                      {/* Card 1: Pontuação */}
+                      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-semibold">Pontuação das Tarefas Concluídas</span>
+                        <span className="text-3xl font-extrabold text-[#320066] mt-2 font-mono">{completedPoints} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">pts</span></span>
+                      </div>
+
+                      {/* Card 2: Tarefas a migrar */}
+                      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-semibold">Tarefas a Serem Migradas</span>
+                        <span className="text-3xl font-extrabold text-rose-600 mt-2 font-mono">{String(unfinishedCount).padStart(2, '0')} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">tarefas</span></span>
+                      </div>
+
+                      {/* Card 3: Porcentagem */}
+                      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-semibold font-semibold">Porcentagem de Concluídas</span>
+                        <span className="text-3xl font-extrabold text-blue-600 mt-2 font-mono">{percentage} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">%</span></span>
+                      </div>
                     </div>
                   );
                 })()}
               </div>
-
-            </div>
-
-            {/* Rodapé: Métricas baseadas na Sprint Ativa */}
-            {(() => {
-              const activeSprint = sprints.find(s => s.status === 'ATIVA');
-              const totalCards = activeSprint ? (activeSprint.cards || []).length : 0;
-              const completedCards = activeSprint ? (activeSprint.cards || []).filter(c => c.status === 'CONCLUIDO') : [];
-              const completedCount = completedCards.length;
-
-              const completedPoints = completedCards.reduce((acc, c) => acc + (c.story_points || 0), 0);
-              const unfinishedCount = totalCards - completedCount;
-              const percentage = totalCards > 0 ? Math.round((completedCount / totalCards) * 100) : 0;
-
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                  {/* Card 1: Pontuação */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Pontuação das Tarefas Concluídas</span>
-                    <span className="text-3xl font-extrabold text-[#320066] mt-2 font-mono">{completedPoints} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">pts</span></span>
-                  </div>
-
-                  {/* Card 2: Tarefas a migrar */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Tarefas a Serem Migradas</span>
-                    <span className="text-3xl font-extrabold text-rose-600 mt-2 font-mono">{String(unfinishedCount).padStart(2, '0')} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">tarefas</span></span>
-                  </div>
-
-                  {/* Card 3: Porcentagem */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Porcentagem de Concluídas</span>
-                    <span className="text-3xl font-extrabold text-blue-600 mt-2 font-mono">{percentage} <span className="text-xs font-semibold text-slate-400 uppercase tracking-normal">%</span></span>
-                  </div>
-                </div>
-              );
-            })()}
-
-          </div>
+            );
+          })()
         ) : activeTab === 'metrics' ? (
           /* ================= TELA MÉTRICAS ================= */
           <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
