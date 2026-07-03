@@ -1,4 +1,8 @@
 import prisma from "../lib/prisma.js";
+import { obterMembroProjeto } from "../utils/projetoAuth.js";
+
+// Valores válidos: Fibonacci [1, 2, 3, 5, 8, 13, 21, 34, 55], 0 (caso queiram usar) ou -1 (para representar "?")
+const VALORES_POKER_VALIDOS = [-1, 0, 1, 2, 3, 5, 8, 13, 21, 34, 55];
 
 /**
  * Listar todos os votos de um card
@@ -6,6 +10,25 @@ import prisma from "../lib/prisma.js";
 export const listarVotosCard = async (req, res) => {
   try {
     const { idCard } = req.params;
+
+    const card = await prisma.card.findUnique({
+      where: { id_card: idCard },
+      select: { id_projeto: true },
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        error: "Card não encontrado",
+      });
+    }
+
+    // Verificar se o usuário autenticado pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
 
     const votos = await prisma.votoPoker.findMany({
       where: {
@@ -35,8 +58,26 @@ export const listarVotosCard = async (req, res) => {
  */
 export const buscarVoto = async (req, res) => {
   try {
-
     const { idCard, idUsuario } = req.params;
+
+    const card = await prisma.card.findUnique({
+      where: { id_card: idCard },
+      select: { id_projeto: true },
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        error: "Card não encontrado",
+      });
+    }
+
+    // Verificar se o usuário autenticado pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
 
     const voto = await prisma.votoPoker.findFirst({
       where: {
@@ -71,19 +112,16 @@ export const buscarVoto = async (req, res) => {
  */
 export const criarVoto = async (req, res) => {
   try {
-
     const { idCard } = req.params;
-    const { id_usuario, valor } = req.body;
+    const { valor } = req.body;
 
-    if (!id_usuario || valor === undefined) {
+    if (valor === undefined) {
       return res.status(400).json({
-        error: "Usuário e valor são obrigatórios",
+        error: "Valor do voto é obrigatório",
       });
     }
 
-    const fibonacci = [1, 2, 3, 5, 8, 13, 21, 34, 55];
-
-    if (!fibonacci.includes(valor)) {
+    if (!VALORES_POKER_VALIDOS.includes(valor)) {
       return res.status(400).json({
         error: "Valor inválido para Planning Poker",
       });
@@ -93,6 +131,7 @@ export const criarVoto = async (req, res) => {
       where: {
         id_card: idCard,
       },
+      select: { id_projeto: true },
     });
 
     if (!card) {
@@ -101,35 +140,43 @@ export const criarVoto = async (req, res) => {
       });
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: {
-        id_usuario,
-      },
+    // Obter o usuário a partir do email autenticado
+    const usuarioLogado = await prisma.usuario.findUnique({
+      where: { email: req.user.email },
     });
 
-    if (!usuario) {
+    if (!usuarioLogado) {
       return res.status(404).json({
-        error: "Usuário não encontrado",
+        error: "Usuário autenticado não encontrado no banco de dados",
       });
     }
 
+    // Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    // Verificar se o usuário já votou
     const votoExistente = await prisma.votoPoker.findFirst({
       where: {
         id_card: idCard,
-        id_usuario,
+        id_usuario: usuarioLogado.id_usuario,
       },
     });
 
     if (votoExistente) {
       return res.status(409).json({
-        error: "Usuário já votou neste card",
+        error: "Usuário já votou neste card. Atualize o voto existente.",
       });
     }
 
     const voto = await prisma.votoPoker.create({
       data: {
         id_card: idCard,
-        id_usuario,
+        id_usuario: usuarioLogado.id_usuario,
         valor,
       },
       include: {
@@ -154,9 +201,20 @@ export const criarVoto = async (req, res) => {
  */
 export const atualizarVoto = async (req, res) => {
   try {
-
     const { id } = req.params;
     const { valor } = req.body;
+
+    if (valor === undefined) {
+      return res.status(400).json({
+        error: "Valor do voto é obrigatório",
+      });
+    }
+
+    if (!VALORES_POKER_VALIDOS.includes(valor)) {
+      return res.status(400).json({
+        error: "Valor inválido para Planning Poker",
+      });
+    }
 
     const voto = await prisma.votoPoker.findUnique({
       where: {
@@ -167,6 +225,17 @@ export const atualizarVoto = async (req, res) => {
     if (!voto) {
       return res.status(404).json({
         error: "Voto não encontrado",
+      });
+    }
+
+    // Obter o usuário a partir do email autenticado
+    const usuarioLogado = await prisma.usuario.findUnique({
+      where: { email: req.user.email },
+    });
+
+    if (!usuarioLogado || voto.id_usuario !== usuarioLogado.id_usuario) {
+      return res.status(403).json({
+        error: "Acesso negado: você só pode alterar o seu próprio voto",
       });
     }
 
@@ -182,7 +251,6 @@ export const atualizarVoto = async (req, res) => {
     return res.status(200).json(votoAtualizado);
 
   } catch (error) {
-
     console.error(error);
 
     return res.status(500).json({
@@ -196,7 +264,6 @@ export const atualizarVoto = async (req, res) => {
  */
 export const deletarVoto = async (req, res) => {
   try {
-
     const { id } = req.params;
 
     const voto = await prisma.votoPoker.findUnique({
@@ -211,6 +278,17 @@ export const deletarVoto = async (req, res) => {
       });
     }
 
+    // Obter o usuário a partir do email autenticado
+    const usuarioLogado = await prisma.usuario.findUnique({
+      where: { email: req.user.email },
+    });
+
+    if (!usuarioLogado || voto.id_usuario !== usuarioLogado.id_usuario) {
+      return res.status(403).json({
+        error: "Acesso negado: você só pode remover o seu próprio voto",
+      });
+    }
+
     await prisma.votoPoker.delete({
       where: {
         id_voto: id,
@@ -222,7 +300,6 @@ export const deletarVoto = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error(error);
 
     return res.status(500).json({
@@ -236,8 +313,34 @@ export const deletarVoto = async (req, res) => {
  */
 export const reiniciarVotacao = async (req, res) => {
   try {
-
     const { idCard } = req.params;
+
+    const card = await prisma.card.findUnique({
+      where: {
+        id_card: idCard,
+      },
+      select: { id_projeto: true },
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        error: "Card não encontrado",
+      });
+    }
+
+    // Verificar se o usuário autenticado é PO ou Gerente do projeto
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado: você não é membro deste projeto",
+      });
+    }
+
+    if (membro.perfil !== "GERENTE" && membro.perfil !== "PO") {
+      return res.status(403).json({
+        error: "Acesso negado: apenas PO e Gerente podem reiniciar a votação",
+      });
+    }
 
     await prisma.votoPoker.deleteMany({
       where: {
@@ -250,7 +353,6 @@ export const reiniciarVotacao = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error(error);
 
     return res.status(500).json({
