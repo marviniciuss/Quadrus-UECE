@@ -1737,45 +1737,29 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                 </div>
                               )}
 
-                              {/* Etiquetas do Card */}
-                              {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                  {card.etiquetas && card.etiquetas.length > 0 ? (
-                                    card.etiquetas.map(et => (
-                                      <span
-                                        key={et.id_etiqueta}
-                                        className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent transition-all"
-                                      >
-                                        {et.nome}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    card.tags.map(t => (
-                                      <span
-                                        key={t}
-                                        className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent"
-                                      >
-                                        {t}
-                                      </span>
-                                    ))
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Divisor */}
+                               {/* Divisor */}
                               <div className="my-3 border-t border-slate-100" />
 
                               {/* Rodapé do Card */}
                               <div className="flex items-center justify-between">
-                                {/* Avatar do responsável */}
-                                <div className="flex -space-x-1.5">
-                                  {card.responsavel && (
-                                    <AvatarWithFallback
-                                      nome={card.responsavel.nome}
-                                      foto={card.responsavel.foto}
-                                      title={card.responsavel.nome}
-                                      className="w-6 h-6 rounded-full border border-white bg-slate-50"
-                                    />
+                                <div className="flex items-center gap-2">
+                                  {/* Avatar do responsável */}
+                                  <div className="flex -space-x-1.5">
+                                    {card.responsavel && (
+                                      <AvatarWithFallback
+                                        nome={card.responsavel.nome}
+                                        foto={card.responsavel.foto}
+                                        title={card.responsavel.nome}
+                                        className="w-6 h-6 rounded-full border border-white bg-slate-50"
+                                      />
+                                    )}
+                                  </div>
+
+                                  {/* Etiquetas do Card (limite a 1) */}
+                                  {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
+                                    <span className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent truncate max-w-[120px]">
+                                      {card.etiquetas && card.etiquetas.length > 0 ? card.etiquetas[0].nome : card.tags[0]}
+                                    </span>
                                   )}
                                 </div>
 
