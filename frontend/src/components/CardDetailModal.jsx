@@ -954,22 +954,13 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
               {/* STATE 4: DECIDED */}
               {!isPokerActive && !isPokerExpired && selectedCard.story_points !== null && (
-                <div className="space-y-4 text-center">
-                  <div className="space-y-2 flex flex-col items-center">
+                <div className="space-y-4 text-left">
+                  <div className="space-y-2 flex flex-col items-start">
                     <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-semibold">Pontuação Decidida</h4>
                     <div className="w-24 h-32 bg-[#320066] hover:bg-[#26004d] text-white border border-[#320066] rounded-2xl flex items-center justify-center shadow-lg shadow-[#320066]/20 transition-all select-none">
                       <span className="font-extrabold text-4xl font-mono">{selectedCard.story_points}</span>
                     </div>
                   </div>
-                  {canManagePoker && (
-                    <button
-                      onClick={handleResetPoker}
-                      className="text-xs font-bold text-[#320066] hover:underline flex items-center justify-center gap-1.5 mx-auto mt-2"
-                    >
-                      <RotateCcw size={12} />
-                      Reiniciar Votação
-                    </button>
-                  )}
                 </div>
               )}
 
