@@ -131,6 +131,7 @@ model Card {
   status         StatusCard       @default(A_FAZER)
   story_points   Int?
   em_risco       Boolean          @default(false)
+  ordem          Int              @default(0)
   tags           String[]         @default([])
   deletado_em    DateTime?        @db.Timestamp
   

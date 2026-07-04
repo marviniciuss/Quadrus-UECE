@@ -98,6 +98,18 @@ export const criarCard = async (req, res) => {
       targetColunaId = primeiraColuna.id_coluna;
     }
 
+    const ultimoCard = await prisma.card.findFirst({
+      where: {
+        id_coluna: targetColunaId,
+        deletado_em: null,
+      },
+      orderBy: {
+        ordem: "desc",
+      },
+    });
+
+const proximaOrdem = ultimoCard ? ultimoCard.ordem + 1 : 1;
+
     const card = await prisma.card.create({
       data: {
         id_projeto: id,
@@ -111,6 +123,7 @@ export const criarCard = async (req, res) => {
         id_sprint: id_sprint || null,
         id_criador: membro.id_usuario,
         story_points: story_points ? parseInt(story_points) : null,
+        ordem: proximaOrdem,
         ...(id_etiquetas && id_etiquetas.length > 0 && {
           etiquetas: {
             connect: id_etiquetas.map((idEt) => ({ id_etiqueta: idEt })),
@@ -175,9 +188,14 @@ export const listarCards = async (req, res) => {
         sprint: true,
         etiquetas: true,
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [
+        {
+          id_coluna: "asc",
+        },
+        {
+          ordem: "asc",
+        },
+      ],
     });
 
     return res.json(cards);
@@ -585,6 +603,82 @@ export const atualizarStatusCard = async (req, res) => {
     console.error(error);
     return res.status(500).json({
       error: "Erro ao atualizar status do card",
+    });
+  }
+};
+
+export const reordenarCards = async (req, res) => {
+  const { id } = req.params;
+
+  const { cards } = req.body;
+
+  try {
+    const card = await prisma.card.findUnique({
+      where: {
+        id_card: id,
+      },
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        error: "Card não encontrado",
+      });
+    }
+
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado",
+      });
+    }
+
+    const isGerente =
+      membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+
+    const isPO = membro.perfil === "PO";
+
+    if (!isGerente && !isPO) {
+      return res.status(403).json({
+        error: "Somente PO, Gerente ou Admin podem reordenar cards.",
+      });
+    }
+
+    await prisma.$transaction(
+      cards.map((card) =>
+        prisma.card.update({
+          where: {
+            id_card: card.id_card,
+          },
+          data: {
+            ordem: card.ordem,
+            id_coluna: card.id_coluna,
+          },
+        })
+      )
+    );
+
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: "Reordenou cards do Kanban",
+      tipo_acao: "MOVIMENTACAO",
+      id_card: id,
+    });
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(card.id_projeto).emit("cards_reordenados");
+    }
+
+    return res.json({
+      message: "Cards reordenados com sucesso.",
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      error: "Erro ao reordenar cards",
     });
   }
 };
