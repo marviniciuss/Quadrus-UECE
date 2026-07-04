@@ -108,7 +108,7 @@ export const criarCard = async (req, res) => {
       },
     });
 
-const proximaOrdem = ultimoCard ? ultimoCard.ordem + 1 : 1;
+    const proximaOrdem = ultimoCard ? ultimoCard.ordem + 1 : 1;
 
     const card = await prisma.card.create({
       data: {
@@ -523,11 +523,26 @@ export const atualizarStatusCard = async (req, res) => {
     // Auto-atribuição: se o card não tem responsável, atribui ao membro que moveu
     const deveAtribuir = !card.id_responsavel;
 
+    let proximaOrdem = card.ordem;
+    if (card.id_coluna !== targetColuna.id_coluna) {
+      const ultimoCard = await prisma.card.findFirst({
+        where: {
+          id_coluna: targetColuna.id_coluna,
+          deletado_em: null,
+        },
+        orderBy: {
+          ordem: "desc",
+        },
+      });
+      proximaOrdem = ultimoCard ? ultimoCard.ordem + 1 : 1;
+    }
+
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
         id_coluna: targetColuna.id_coluna,
         status: legacyStatus,
+        ordem: proximaOrdem,
         ...(deveAtribuir && { id_responsavel: membro.id_usuario }),
       },
       include: {
@@ -644,18 +659,33 @@ export const reordenarCards = async (req, res) => {
       });
     }
 
+    const colunas = await prisma.coluna.findMany({
+      where: { id_projeto: card.id_projeto },
+    });
+
+    const colMap = {};
+    colunas.forEach(col => {
+      let legacyStatus = "A_FAZER";
+      if (col.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
+      else if (col.nome === "HOMOLOGAÇÃO") legacyStatus = "HOMOLOGACAO";
+      else if (col.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
+      colMap[col.id_coluna] = legacyStatus;
+    });
+
     await prisma.$transaction(
-      cards.map((card) =>
-        prisma.card.update({
+      cards.map((c) => {
+        const legacyStatus = colMap[c.id_coluna] || "A_FAZER";
+        return prisma.card.update({
           where: {
-            id_card: card.id_card,
+            id_card: c.id_card,
           },
           data: {
-            ordem: card.ordem,
-            id_coluna: card.id_coluna,
+            ordem: c.ordem,
+            id_coluna: c.id_coluna,
+            status: legacyStatus,
           },
-        })
-      )
+        });
+      })
     );
 
     await registrarLog({
