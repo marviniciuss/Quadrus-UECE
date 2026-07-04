@@ -308,6 +308,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Card Detail Modal State
   const [selectedCardId, setSelectedCardId] = useState(null);
 
+  // Drag and Drop States
+  const [draggedCardId, setDraggedCardId] = useState(null);
+  const [dragOverCardId, setDragOverCardId] = useState(null);
+
   // Reset invite modal state when closed
   useEffect(() => {
     if (!isInviteModalOpen) {
@@ -656,6 +660,13 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       else if (targetColObj.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
     }
 
+    // Encontrar maxOrdem atual da coluna de destino para manter a ordenação local correta
+    const targetColCards = (project.cards || [])
+      .filter(c => c.id_coluna === targetStatus && c.id_card !== cardId);
+    const maxOrdem = targetColCards.length > 0
+      ? Math.max(...targetColCards.map(c => c.ordem || 0))
+      : 0;
+
     // Atualização otimista
     const updatedCards = project.cards.map(card => {
       if (card.id_card === cardId) {
@@ -665,6 +676,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
           status: legacyStatus,
           id_responsavel: optimisticResponsavelId,
           responsavel: optimisticResponsavel,
+          ordem: maxOrdem + 1,
         };
       }
       return card;
@@ -690,6 +702,115 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       .catch(err => {
         console.error('Erro ao persistir movimentação:', err);
         showToast('Erro ao movimentar card.', 'error');
+        // Rollback
+        onUpdateProject({
+          ...project,
+          cards: previousCards,
+        });
+      });
+  };
+
+  const handleDropOnCard = (e, targetCardId, targetColumnId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCardId(null);
+
+    const cardId = e.dataTransfer.getData('text/plain') || draggedCardId;
+    if (!cardId || cardId === targetCardId) return;
+
+    if (isOutsideSprintPeriod()) {
+      alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
+      setActiveTab('sprint');
+      return;
+    }
+
+    const previousCards = project.cards;
+
+    // 1. Encontrar o card arrastado e o card alvo
+    let cards = [...(project.cards || [])];
+    const draggedCard = cards.find(c => c.id_card === cardId);
+    const targetCard = cards.find(c => c.id_card === targetCardId);
+    if (!draggedCard || !targetCard) return;
+
+    // Determinar status legado correspondente
+    const targetColObj = (project.colunas || []).find(c => c.id_coluna === targetColumnId);
+    let legacyStatus = "A_FAZER";
+    if (targetColObj) {
+      if (targetColObj.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
+      else if (targetColObj.nome === "HOMOLOGAÇÃO") legacyStatus = "HOMOLOGACAO";
+      else if (targetColObj.nome === "CONCLUÍDO") legacyStatus = "CONCLUIDO";
+    }
+
+    // Auto-atribuição otimista
+    let optimisticResponsavel = draggedCard.responsavel;
+    let optimisticResponsavelId = draggedCard.id_responsavel;
+    if (!draggedCard.id_responsavel) {
+      const currentMember = members.find(m => m.email === currentUserEmail);
+      if (currentMember) {
+        optimisticResponsavel = {
+          id_usuario: currentMember.id_usuario,
+          nome: currentMember.nome,
+          email: currentMember.email,
+        };
+        optimisticResponsavelId = currentMember.id_usuario;
+      }
+    }
+
+    // 2. Filtrar cards na coluna destino excluindo o card arrastado, e ordenar por ordem
+    const targetColCards = cards
+      .filter(c => c.id_coluna === targetColumnId && c.id_card !== cardId)
+      .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+
+    // Achar o index do card alvo
+    const targetIndex = targetColCards.findIndex(c => c.id_card === targetCardId);
+    
+    // Inserir o card arrastado no index do card alvo (ficando antes dele)
+    const newDraggedCard = {
+      ...draggedCard,
+      id_coluna: targetColumnId,
+      status: legacyStatus,
+      id_responsavel: optimisticResponsavelId,
+      responsavel: optimisticResponsavel,
+    };
+    targetColCards.splice(targetIndex, 0, newDraggedCard);
+
+    // 3. Atualizar a ordem (1-indexed) de todos os cards daquela coluna
+    const updatedColCards = targetColCards.map((c, index) => ({
+      ...c,
+      ordem: index + 1,
+    }));
+
+    // 4. Montar a lista atualizada de cards do projeto
+    const updatedCards = cards.map(c => {
+      const foundInUpdated = updatedColCards.find(uc => uc.id_card === c.id_card);
+      if (foundInUpdated) {
+        return foundInUpdated;
+      }
+      if (c.id_card === cardId) {
+        return newDraggedCard;
+      }
+      return c;
+    });
+
+    onUpdateProject({
+      ...project,
+      cards: updatedCards,
+    });
+
+    // 5. Persistir no backend
+    const payload = updatedColCards.map(c => ({
+      id_card: c.id_card,
+      ordem: c.ordem,
+      id_coluna: c.id_coluna,
+    }));
+
+    api.patch(`/api/cards/${cardId}/reordenar`, { cards: payload })
+      .then(() => {
+        // Sucesso silencioso
+      })
+      .catch(err => {
+        console.error('Erro ao persistir reordenação:', err);
+        showToast('Erro ao reordenar card.', 'error');
         // Rollback
         onUpdateProject({
           ...project,
@@ -1774,8 +1895,27 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                             <div
                               key={card.id_card}
                               draggable
-                              onDragStart={(e) => handleDragStart(e, card.id_card)}
-                              onDragEnd={handleDragEnd}
+                              onDragStart={(e) => {
+                                handleDragStart(e, card.id_card);
+                                setDraggedCardId(card.id_card);
+                              }}
+                              onDragEnd={(e) => {
+                                handleDragEnd(e);
+                                setDraggedCardId(null);
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (draggedCardId && draggedCardId !== card.id_card) {
+                                  setDragOverCardId(card.id_card);
+                                }
+                              }}
+                              onDragLeave={() => {
+                                setDragOverCardId(null);
+                              }}
+                              onDrop={(e) => {
+                                setDragOverCardId(null);
+                                handleDropOnCard(e, card.id_card, col.id);
+                              }}
                               onClick={() => {
                                 if (isOutsideSprintPeriod()) {
                                   alert("A sprint atual está fora do prazo. Por favor, ajuste as datas ou encerre-a na tela de planejamento.");
@@ -1784,7 +1924,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                 }
                                 setSelectedCardId(card.id_card);
                               }}
-                              className="group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4"
+                              className={`group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4 ${
+                                dragOverCardId === card.id_card ? 'border-t-4 border-t-[#320066]' : ''
+                              }`}
                               style={{ borderLeftColor: col.colorHex || '#64748b' }}
                             >
                               {/* Topo do Card: Badge de Prioridade */}
