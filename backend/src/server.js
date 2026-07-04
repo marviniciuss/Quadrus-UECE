@@ -16,6 +16,7 @@ import membroProjetoRoutes from "./routes/membroProjetoRoutes.js";
 import anexoCardRoutes from "./routes/anexoCardRoutes.js";
 import votoPokerRoutes from "./routes/votoPokerRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
+import { inicializarTimeoutsPoker } from "./utils/pokerScheduler.js";
 
 dotenv.config();
 
@@ -69,6 +70,7 @@ const io = new Server(httpServer, {
   }
 });
 app.set('io', io);
+inicializarTimeoutsPoker(io);
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);

@@ -1,8 +1,46 @@
 import prisma from "../lib/prisma.js";
 import { obterMembroProjeto } from "../utils/projetoAuth.js";
 import { registrarLog } from "../utils/registrarLog.js";
+import { parsePokerMetadata, schedulePokerExpiration, cancelPokerExpiration } from "../utils/pokerScheduler.js";
 
 const PRIORIDADES_VALIDAS = ["BAIXA", "MEDIA", "ALTA"];
+
+/**
+ * Anonimiza os votos de um card de acordo com o perfil e o estado do poker
+ */
+export const anonymizeVotes = (card, currentUserEmail, userPerfil) => {
+  if (!card || !card.votos) return card;
+
+  const poker = parsePokerMetadata(card.descricao);
+  if (!poker || !poker.active || !poker.expiresAt) return card;
+
+  const isExpired = new Date(poker.expiresAt) <= new Date();
+  const canSeeDetailed = isExpired && (userPerfil === "PO" || userPerfil === "GERENTE" || userPerfil === "ADMIN");
+
+  if (!canSeeDetailed) {
+    card.votos = card.votos.map(v => {
+      if (v.usuario?.email === currentUserEmail) {
+        return v;
+      }
+      return {
+        id_voto: v.id_voto,
+        id_card: v.id_card,
+        id_usuario: "anonymous",
+        valor: v.valor,
+        createdAt: v.createdAt,
+        updatedAt: v.updatedAt,
+        usuario: {
+          id_usuario: "anonymous",
+          nome: "Desenvolvedor Anônimo",
+          email: "anonymous@quadrus.com",
+          foto: null
+        }
+      };
+    });
+  }
+
+  return card;
+};
 
 /* =========================
    CRIAR CARD EM UM PROJETO
@@ -221,7 +259,11 @@ export const buscarCard = async (req, res) => {
         sprint: true,
         projeto: true,
         anexos: true,
-        votos: true,
+        votos: {
+          include: {
+            usuario: true,
+          },
+        },
         etiquetas: true,
       },
     });
@@ -240,7 +282,8 @@ export const buscarCard = async (req, res) => {
       });
     }
 
-    return res.json(card);
+    const cardAnonimizado = anonymizeVotes(card, req.user.email, membro.perfil);
+    return res.json(cardAnonimizado);
   } catch (error) {
     console.error(error);
     return res.status(500).json({
@@ -348,6 +391,8 @@ export const atualizarCard = async (req, res) => {
       }
     }
 
+    const oldPoker = parsePokerMetadata(card.descricao);
+
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
@@ -372,6 +417,76 @@ export const atualizarCard = async (req, res) => {
         etiquetas: true,
       },
     });
+
+    const newPoker = parsePokerMetadata(cardAtualizado.descricao);
+    const oldActive = oldPoker && oldPoker.active;
+    const newActive = newPoker && newPoker.active;
+    const io = req.app.get('io');
+
+    if (!oldActive && newActive) {
+      // 1. Criar notificações para todos os DEV do projeto
+      try {
+        const devs = await prisma.membroProjeto.findMany({
+          where: {
+            id_projeto: card.id_projeto,
+            perfil: "DEV"
+          },
+          include: { usuario: true }
+        });
+
+        const mensagem = `A votação do Planning Poker para o card "${cardAtualizado.titulo}" foi iniciada.`;
+
+        for (const dev of devs) {
+          const notificacao = await prisma.notificacao.create({
+            data: {
+              id_usuario_destino: dev.id_usuario,
+              id_card_origem: cardAtualizado.id_card,
+              mensagem
+            },
+            include: {
+              card: {
+                select: {
+                  id_card: true,
+                  titulo: true,
+                  status: true,
+                  id_projeto: true
+                }
+              }
+            }
+          });
+
+          if (io) {
+            io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+          }
+        }
+      } catch (errNotif) {
+        console.error("Erro ao notificar devs sobre poker:", errNotif);
+      }
+
+      // 2. Agendar timer de expiração
+      if (newPoker.expiresAt) {
+        const delay = new Date(newPoker.expiresAt).getTime() - Date.now();
+        if (delay > 0) {
+          schedulePokerExpiration(cardAtualizado.id_card, delay, io);
+        }
+      }
+
+      if (io) {
+        io.to(`poker:${cardAtualizado.id_card}`).emit('poker_session_update');
+      }
+    } else if (oldActive && !newActive) {
+      // Cancelar expiração ativa
+      cancelPokerExpiration(cardAtualizado.id_card);
+      if (io) {
+        io.to(`poker:${cardAtualizado.id_card}`).emit('poker_session_update');
+      }
+    }
+
+    // Emissão socket geral de atualização do card para o KanbanBoard (removendo votos por segurança)
+    if (io) {
+      const cardToEmit = { ...cardAtualizado, votos: [] };
+      io.to(card.id_projeto).emit('card_moved', cardToEmit);
+    }
 
     await registrarLog({
       id_usuario: membro.id_usuario,

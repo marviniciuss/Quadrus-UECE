@@ -1,5 +1,7 @@
 import prisma from "../lib/prisma.js";
 import { obterMembroProjeto } from "../utils/projetoAuth.js";
+import { anonymizeVotes } from "./cardController.js";
+import { verificarEEncerrarPokerAutomatico } from "../utils/pokerScheduler.js";
 
 // Valores válidos: Fibonacci [1, 2, 3, 5, 8, 13, 21] ou -1 (para representar "não sei")
 const VALORES_POKER_VALIDOS = [-1, 1, 2, 3, 5, 8, 13, 21];
@@ -13,7 +15,7 @@ export const listarVotosCard = async (req, res) => {
 
     const card = await prisma.card.findUnique({
       where: { id_card: idCard },
-      select: { id_projeto: true },
+      select: { id_projeto: true, descricao: true },
     });
 
     if (!card) {
@@ -42,7 +44,13 @@ export const listarVotosCard = async (req, res) => {
       },
     });
 
-    return res.status(200).json(votos);
+    const dummyCard = {
+      descricao: card.descricao,
+      votos: votos
+    };
+    const anonymizedCard = anonymizeVotes(dummyCard, req.user.email, membro.perfil);
+
+    return res.status(200).json(anonymizedCard.votos);
 
   } catch (error) {
     console.error(error);
@@ -179,11 +187,13 @@ export const criarVoto = async (req, res) => {
         id_usuario: usuarioLogado.id_usuario,
         valor,
       },
-      include: {
-        usuario: true,
-        card: true,
-      },
     });
+
+    const io = req.app.get('io');
+    await verificarEEncerrarPokerAutomatico(idCard, io);
+    if (io) {
+      io.to(`poker:${idCard}`).emit('poker_session_update');
+    }
 
     return res.status(201).json(voto);
 
@@ -248,6 +258,11 @@ export const atualizarVoto = async (req, res) => {
       },
     });
 
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`poker:${voto.id_card}`).emit('poker_session_update');
+    }
+
     return res.status(200).json(votoAtualizado);
 
   } catch (error) {
@@ -294,6 +309,11 @@ export const deletarVoto = async (req, res) => {
         id_voto: id,
       },
     });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`poker:${voto.id_card}`).emit('poker_session_update');
+    }
 
     return res.status(200).json({
       mensagem: "Voto removido com sucesso",
@@ -347,6 +367,11 @@ export const reiniciarVotacao = async (req, res) => {
         id_card: idCard,
       },
     });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`poker:${idCard}`).emit('poker_session_update');
+    }
 
     return res.status(200).json({
       mensagem: "Votação reiniciada com sucesso",

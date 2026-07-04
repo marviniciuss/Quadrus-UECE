@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api.js';
+import { socket, joinPokerRoom, leavePokerRoom } from '../utils/socket.js';
 import {
   Calendar,
   X,
@@ -169,6 +170,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   useEffect(() => {
     if (cardId) {
       setLoadingCard(true);
+      setPokerSelectedCard(null);
       reloadCardDetail(cardId).finally(() => setLoadingCard(false));
     }
   }, [cardId]);
@@ -185,6 +187,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
       return;
     }
 
+    let expiredTriggered = false;
+
     const updateTimer = () => {
       const expires = new Date(parsed.poker.expiresAt).getTime();
       const now = Date.now();
@@ -192,6 +196,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
       if (diff <= 0) {
         setTimeLeft('Expirado');
+        if (!expiredTriggered) {
+          expiredTriggered = true;
+          reloadCardDetail(selectedCard.id_card);
+        }
         return;
       }
 
@@ -206,6 +214,38 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [selectedCard]);
+
+  // Real-time socket updates for Planning Poker
+  useEffect(() => {
+    if (!selectedCard?.id_card) return;
+
+    const idCard = selectedCard.id_card;
+    joinPokerRoom(idCard);
+
+    const handlePokerUpdate = () => {
+      console.log("Recebida atualização de Planning Poker para o card:", idCard);
+      reloadCardDetail(idCard);
+    };
+
+    socket.on('poker_session_update', handlePokerUpdate);
+
+    return () => {
+      leavePokerRoom(idCard);
+      socket.off('poker_session_update', handlePokerUpdate);
+    };
+  }, [selectedCard?.id_card]);
+
+  // Sync modal state with Kanban Board updates
+  useEffect(() => {
+    if (project?.cards && selectedCard) {
+      const updated = project.cards.find(c => c.id_card === selectedCard.id_card);
+      if (updated && JSON.stringify(updated) !== JSON.stringify(selectedCard)) {
+        setSelectedCard(updated);
+        setNewDescriptionText(parseCardDesc(updated.descricao).descriptionText);
+        setTempTitle(updated.titulo);
+      }
+    }
+  }, [project?.cards, selectedCard?.id_card]);
 
   // --- Manipuladores ---
   const handleSaveDescription = async () => {
@@ -756,42 +796,62 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                 </div>
               )}
 
-              {/* STATE 2: ACTIVE */}
-              {isPokerActive && (
+              {/* STATE 2 & 3: ACTIVE OR EXPIRED */}
+              {(isPokerActive || isPokerExpired) && (
                 <div className="space-y-4">
-                  {/* Countdown */}
-                  <div className="text-center p-2.5 bg-brand-50 border border-brand-100 rounded-xl">
-                    <p className="text-[10px] font-bold text-brand-600 uppercase">Tempo Restante</p>
-                    <p className="text-lg font-extrabold text-brand-700 font-mono mt-0.5">{timeLeft}</p>
-                  </div>
+                  {/* Countdown / Status */}
+                  {isPokerActive ? (
+                    <div className="text-center p-2.5 bg-brand-50 border border-brand-100 rounded-xl">
+                      <p className="text-[10px] font-bold text-brand-600 uppercase">Tempo Restante</p>
+                      <p className="text-lg font-extrabold text-brand-700 font-mono mt-0.5">{timeLeft}</p>
+                    </div>
+                  ) : (
+                    <div className="text-center p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold">
+                      Tempo esgotado! Aguardando definição da pontuação.
+                    </div>
+                  )}
 
                   {/* Deck de Cartas */}
                   <div className="grid grid-cols-4 gap-2">
                     {[1, 2, 3, 5, 8, 13, 21, '?'].map((val) => {
-                      const isSelected = pokerSelectedCard === val;
                       const dbVal = val === '?' ? -1 : val;
                       const voteCountOnCard = voteCounts[dbVal] || 0;
-                      const userVotedThis = meuVoto && meuVoto.valor === dbVal;
+
+                      // Determina se este card está selecionado pelo usuário ativo
+                      const isSelected = pokerSelectedCard === val;
+                      const userVotedThis = isPokerActive && meuVoto && meuVoto.valor === dbVal;
+                      
+                      // Highlight final selection for PO/Gerente during expiration
+                      const isDecidedSelection = isPokerExpired && isSelected;
+
+                      // Classes de estilo
+                      let cardClass = "";
+                      if (userVotedThis || isDecidedSelection) {
+                        cardClass = "border-[#320066] bg-[#320066] text-white shadow-md";
+                      } else if (voteCountOnCard > 0) {
+                        cardClass = "border-[#b8a2cf] bg-[#b8a2cf] text-white";
+                      } else if (isSelected) {
+                        cardClass = "border-[#320066] bg-purple-50 text-[#320066] scale-105 shadow-sm";
+                      } else {
+                        cardClass = "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-150";
+                      }
+
+                      // Interatividade:
+                      // - Se ativo: apenas DEV pode votar.
+                      // - Se expirado: apenas PO/Gerente pode selecionar pontuação.
+                      const canClick = isPokerActive ? isDev : (isPokerExpired && canManagePoker);
 
                       return (
                         <button
                           key={val}
                           type="button"
-                          onClick={() => isDev && setPokerSelectedCard(val)}
-                          className={`h-16 border rounded-xl flex flex-col items-center justify-between p-1.5 relative transition-all ${
-                            userVotedThis 
-                              ? 'border-[#320066] bg-[#320066] text-white' 
-                              : isSelected 
-                                ? 'border-[#320066] bg-purple-50 text-[#320066] scale-105 shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                          }`}
-                          disabled={!isDev}
+                          onClick={() => canClick && setPokerSelectedCard(val)}
+                          className={`h-24 border rounded-2xl flex flex-col items-center justify-center p-2 relative transition-all ${cardClass}`}
+                          disabled={!canClick}
                         >
-                          <span className="font-extrabold text-sm mt-1">{val}</span>
+                          <span className="font-extrabold text-2xl">{val}</span>
                           {voteCountOnCard > 0 && (
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
-                              userVotedThis ? 'bg-white text-[#320066]' : 'bg-slate-100 text-slate-500'
-                            }`}>
+                            <span className="text-[10px] font-medium mt-1">
                               {voteCountOnCard} {voteCountOnCard === 1 ? 'voto' : 'votos'}
                             </span>
                           )}
@@ -800,8 +860,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                     })}
                   </div>
 
-                  {/* Botoes de Acao do Voto */}
-                  {isDev && (
+                  {/* Botoes de Acao de Voto (Apenas durante Votação Ativa e para DEV) */}
+                  {isPokerActive && isDev && (
                     <div className="pt-2 text-center">
                       {meuVoto && !pokerSelectedCard ? (
                         <div className="space-y-2">
@@ -832,62 +892,42 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                     </div>
                   )}
 
-                  {/* Apenas PO/Gerente pode fechar antes */}
-                  {canManagePoker && (
+                  {/* Botoes de Encerramento (Apenas para PO/Gerente durante Votação Ativa) */}
+                  {isPokerActive && canManagePoker && (
                     <div className="pt-2 border-t border-slate-200">
                       <button
                         onClick={() => handleDecidePoints('?')}
-                        className="w-full py-1.5 border border-slate-205 hover:bg-slate-50 text-slate-500 rounded-xl text-xs font-semibold"
+                        className="w-full py-2 border border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl text-xs font-semibold"
                       >
                         Encerrar Votação
                       </button>
                     </div>
                   )}
-                </div>
-              )}
 
-              {/* STATE 3: EXPIRED */}
-              {isPokerExpired && (
-                <div className="space-y-4">
-                  <div className="text-center p-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold">
-                    Tempo esgotado! Aguardando definição da pontuação.
-                  </div>
-
-                  <div className="space-y-2 text-left">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Votos Detalhados</h4>
-                    <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden max-h-36 overflow-y-auto">
-                      {selectedCard.votos?.map((v) => (
-                        <div key={v.id_voto} className="p-2.5 flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-700">{v.usuario.nome}</span>
-                          <span className="font-mono font-extrabold text-[#320066] bg-purple-50 px-1.5 py-0.5 rounded">
-                            {v.valor === -1 ? '?' : v.valor}
-                          </span>
-                        </div>
-                      ))}
-                      {(!selectedCard.votos || selectedCard.votos.length === 0) && (
-                        <p className="p-3 text-xs italic text-slate-400 text-center">Nenhum voto registrado.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {canManagePoker ? (
-                    <div className="space-y-3 pt-2">
-                      <div className="space-y-1.5">
-                        <label className="block text-[9px] font-bold text-slate-400 uppercase">Escolha a Pontuação Definitiva</label>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {[1, 2, 3, 5, 8, 13, 21, '?'].map((val) => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setPokerSelectedCard(val)}
-                              className={`py-1.5 border rounded-lg text-xs font-extrabold ${pokerSelectedCard === val ? 'border-[#320066] bg-[#320066] text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                            >
-                              {val}
-                            </button>
-                          ))}
-                        </div>
+                  {/* Votos Detalhados (Exibidos apenas quando a votação está Expirada) */}
+                  {isPokerExpired && (
+                    <div className="space-y-2 text-left pt-2 border-t border-slate-200">
+                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Votos Detalhados</h4>
+                      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden max-h-36 overflow-y-auto">
+                        {selectedCard.votos?.map((v) => (
+                          <div key={v.id_voto} className="p-2.5 flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-700">{v.usuario.nome}</span>
+                            <span className="font-mono font-extrabold text-[#320066] bg-purple-50 px-1.5 py-0.5 rounded">
+                              {v.valor === -1 ? '?' : v.valor}
+                            </span>
+                          </div>
+                        ))}
+                        {(!selectedCard.votos || selectedCard.votos.length === 0) && (
+                          <p className="p-3 text-xs italic text-slate-400 text-center">Nenhum voto registrado.</p>
+                        )}
                       </div>
-                      <div className="space-y-2 flex flex-col">
+                    </div>
+                  )}
+
+                  {/* Botoes de Decisao Final (Apenas para PO/Gerente durante Expirado) */}
+                  {isPokerExpired && (
+                    canManagePoker ? (
+                      <div className="space-y-2 pt-2">
                         <button
                           onClick={() => handleDecidePoints(pokerSelectedCard)}
                           disabled={pokerSelectedCard === null}
@@ -903,9 +943,11 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                           Reiniciar Votação
                         </button>
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic text-center">Aguardando o PO ou Gerente salvar a pontuação final.</p>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic text-center pt-2">
+                        Aguardando o PO ou Gerente salvar a pontuação final.
+                      </p>
+                    )
                   )}
                 </div>
               )}
