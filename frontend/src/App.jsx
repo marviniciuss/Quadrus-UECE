@@ -26,6 +26,7 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Estado do usuário no banco de dados (para ID de notificações)
   const [dbUser, setDbUser] = useState(null);
@@ -308,28 +309,32 @@ export default function App() {
   const userDisplayName = currentUser.displayName || currentUser.email.split('@')[0];
 
   return (
-    <div className={`min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans ${selectedProject ? 'h-screen overflow-hidden' : ''}`}>
+    <div className={`min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans ${selectedProject ? 'md:h-screen md:overflow-hidden' : ''}`}>
 
       {/* Header Superior Principal */}
       <header className="border-b border-slate-200 bg-white sticky top-0 z-50 px-6 py-4 flex items-center justify-between shadow-sm">
 
         {/* Lado Esquerdo: Logo, Menu e Botão Dropdown */}
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
+          <div
+            onClick={() => selectedProject && setSidebarOpen(!sidebarOpen)}
+            className={`flex items-center gap-2 shrink-0 ${selectedProject ? 'cursor-pointer hover:opacity-80 active:scale-95 transition-all' : ''}`}
+            title={selectedProject ? "Alternar Menu Lateral" : ""}
+          >
             <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 shadow-md shadow-brand-500/10 select-none">
               <rect width="100" height="100" rx="30" fill="#320066" />
               <polygon points="50,23 74,37 74,63 50,77 26,63 26,37" fill="white" stroke="white" strokeWidth="6" strokeLinejoin="round" />
               <path d="M 50,50 L 50,81 M 50,50 L 22,34 M 50,50 L 78,34" stroke="#320066" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">
+            <span className="hidden sm:inline font-extrabold text-xl tracking-tight bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">
               Quadrus
             </span>
           </div>
 
-          <nav className="flex items-center gap-4 border-l border-slate-200 pl-6">
+          <nav className="flex items-center gap-2 sm:gap-4 sm:border-l sm:border-slate-200 sm:pl-6 pl-2">
             <span
               onClick={() => handleSelectProject(null)}
-              className="font-bold text-sm text-slate-800 cursor-pointer hover:text-brand-600 transition-colors"
+              className="hidden sm:inline font-bold text-sm text-slate-800 cursor-pointer hover:text-brand-600 transition-colors whitespace-nowrap shrink-0"
             >
               Projetos
             </span>
@@ -337,7 +342,7 @@ export default function App() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs border border-brand-200 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs border border-brand-200 transition-all active:scale-95 whitespace-nowrap shrink-0"
               >
                 <span>Selecionar projeto</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
@@ -378,7 +383,7 @@ export default function App() {
             </div>
 
             {selectedProject && (
-              <span className="text-xs px-2.5 py-1 rounded-full border border-brand-200 bg-brand-50 text-brand-700 font-bold ml-2 animate-fade-in">
+              <span className="hidden md:inline-block text-xs px-2.5 py-1 rounded-full border border-brand-200 bg-brand-50 text-brand-700 font-bold ml-2 animate-fade-in whitespace-nowrap truncate max-w-[100px] sm:max-w-[150px]" title={selectedProject.nome}>
                 {selectedProject.nome}
               </span>
             )}
@@ -388,7 +393,7 @@ export default function App() {
         {/* Lado Direito: Notificações, Dúvidas, Perfil e Sair */}
         <div className="flex items-center gap-4">
           {/* Central de Ajuda Dropdown */}
-          <div className="relative" ref={helpRef}>
+          <div className="relative hidden sm:block" ref={helpRef}>
             <button
               className={`p-2 rounded-lg transition-colors ${helpOpen ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
               title="Dúvidas / Ajuda"
@@ -488,7 +493,7 @@ export default function App() {
 
           <button
             onClick={() => setIsProfileModalOpen(true)}
-            className="flex items-center gap-2 pl-2 border-l border-slate-200 hover:opacity-80 transition-opacity focus:outline-none"
+            className="flex items-center gap-2 pl-2 border-l border-slate-200 hover:opacity-80 transition-opacity focus:outline-none whitespace-nowrap shrink-0"
             title="Configurações do Perfil"
           >
             <img
@@ -496,23 +501,16 @@ export default function App() {
               alt="Avatar do Usuário"
               className="w-8 h-8 rounded-full border border-slate-200 bg-slate-100 object-cover"
             />
-            <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight">
+            <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight whitespace-nowrap truncate max-w-[120px]">
               {dbUser?.nome || userDisplayName}
             </span>
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-            title="Sair da Sessão"
-          >
-            <LogOut size={20} />
-          </button>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
-      <main className={`flex-1 w-full mx-auto transition-all duration-300 ${selectedProject ? 'max-w-full px-6 md:px-8 flex flex-col min-h-0 overflow-hidden' : 'max-w-7xl p-4 md:p-6'}`}>
+      <main className={`flex-1 w-full mx-auto transition-all duration-300 ${selectedProject ? 'max-w-full px-6 md:px-8 flex flex-col min-h-0 md:overflow-hidden' : 'max-w-7xl p-4 md:p-6'}`}>
         {!selectedProject ? (
           // Passamos a lista de projetos, a função de criação e o nome do usuário logado
           <ProjectList
@@ -533,6 +531,9 @@ export default function App() {
             onProjectAction={() => { handleSelectProject(null); fetchProjects(showArchived); }}
             userDisplayName={userDisplayName}
             currentUserEmail={currentUser.email}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            onLogout={handleLogout}
           />
         )}
       </main>

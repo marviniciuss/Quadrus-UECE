@@ -33,7 +33,16 @@ const processarExpiracaoPoker = async (cardId, io) => {
     if (!card) return;
 
     const poker = parsePokerMetadata(card.descricao);
-    if (!poker || !poker.active) return;
+    if (!poker || !poker.active || poker.processed) return;
+
+    // Marcar como processada para evitar reprocessamento
+    const novoPoker = { ...poker, processed: true };
+    const regex = /<!-- POKER_METADATA:\s*({.*?})\s*-->/;
+    const novaDescricao = card.descricao.replace(regex, `<!-- POKER_METADATA: ${JSON.stringify(novoPoker)} -->`);
+    await prisma.card.update({
+      where: { id_card: cardId },
+      data: { descricao: novaDescricao }
+    });
 
     // Verificar se já não foi decidida a pontuação
     if (card.story_points !== null) return;
@@ -137,7 +146,7 @@ export const inicializarTimeoutsPoker = async (io) => {
 
     for (const card of cards) {
       const poker = parsePokerMetadata(card.descricao);
-      if (poker && poker.active && poker.expiresAt) {
+      if (poker && poker.active && poker.expiresAt && !poker.processed) {
         const expiresTime = new Date(poker.expiresAt).getTime();
         const now = Date.now();
         const delay = expiresTime - now;
@@ -190,9 +199,9 @@ export const verificarEEncerrarPokerAutomatico = async (cardId, io) => {
       // Cancelar o timeout em memória
       cancelPokerExpiration(cardId);
 
-      // Atualizar a descrição do card definindo expiresAt como a data atual (já expirada)
+      // Atualizar a descrição do card definindo expiresAt como a data atual (já expirada) e processed: true
       const novoExpiresAt = new Date().toISOString();
-      const novoPoker = { ...poker, expiresAt: novoExpiresAt };
+      const novoPoker = { ...poker, expiresAt: novoExpiresAt, processed: true };
       
       const regex = /<!-- POKER_METADATA:\s*({.*?})\s*-->/;
       const novaDescricao = card.descricao.replace(regex, `<!-- POKER_METADATA: ${JSON.stringify(novoPoker)} -->`);

@@ -30,7 +30,8 @@ import {
   Sliders,
   ChevronLeft,
   ChevronRight,
-  History
+  History,
+  LogOut
 } from 'lucide-react';
 
 // Componente de Toast para notificações inline
@@ -77,7 +78,7 @@ function AvatarWithFallback({ nome, foto, className = '', title }) {
   );
 }
 
-export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction }) {
+export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction, sidebarOpen, setSidebarOpen, onLogout }) {
   // Ref para acessar o projeto atualizado dentro de callbacks de socket
   const projectRef = useRef(project);
   useEffect(() => {
@@ -167,8 +168,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Estado para controlar a aba ativa no Menu Lateral
   const [activeTab, setActiveTab] = useState('board'); // 'board', 'sprint', 'metrics', 'settings'
 
-  // Controle do menu lateral em telas menores
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Controle do menu lateral em telas menores (removido do estado local, agora recebido por props)
 
   // Estados de Busca e Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -1403,14 +1403,6 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
       {/* Toast Notifications */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {/* Botão de Menu Flutuante para Mobile */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="md:hidden fixed bottom-6 right-6 z-50 bg-brand-600 text-white p-4 rounded-full shadow-lg active:scale-95 transition-all"
-      >
-        <Menu size={24} />
-      </button>
-
       {/* ================= 1. MENU LATERAL (SIDEBAR) ================= */}
       <aside className={`
         fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 pt-20 px-4 flex flex-col justify-between transition-transform duration-300 ease-in-out
@@ -1418,16 +1410,6 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="space-y-6">
-          {/* Logo e Nome em Mobile (pois em desktop já está no header) */}
-          <div className="flex md:hidden items-center gap-2 px-2 pb-4 border-b border-slate-100">
-            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 select-none">
-              <rect width="100" height="100" rx="30" fill="#320066" />
-              <polygon points="50,23 74,37 74,63 50,77 26,63 26,37" fill="white" stroke="white" strokeWidth="6" strokeLinejoin="round" />
-            </svg>
-            <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">
-              Quadrus
-            </span>
-          </div>
 
           {/* Links do Menu */}
           <nav className="space-y-1.5 text-left">
@@ -1478,11 +1460,20 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
         </div>
 
         {/* Informações Inferiores do Menu */}
-        <div className="border-t border-slate-100 py-4 text-left">
+        <div className="border-t border-slate-100 py-4 text-left space-y-3.5">
           <div className="flex items-center gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-100">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Workspace Ativo</span>
           </div>
+
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold border-l-4 border-transparent text-rose-500 hover:text-rose-700 hover:bg-rose-50/50 transition-all active:scale-95"
+            title="Sair da Sessão"
+          >
+            <LogOut size={18} />
+            <span>Sair da Sessão</span>
+          </button>
         </div>
       </aside>
 
@@ -1500,7 +1491,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
         {activeTab === 'board' ? (
           <>
             {/* ================= BARRA DE FERRAMENTAS / TOOLBAR ================= */}
-            <div className="bg-white border border-slate-200 rounded-2xl py-4.5 px-6 shadow-sm mb-6 flex flex-row items-center gap-4 w-full min-h-[80px]">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 md:py-4.5 md:px-6 shadow-sm mb-6 flex flex-wrap items-center gap-4 w-full">
 
               {/* Lista de Membros do Projeto */}
               <div className="flex items-center shrink-0">
@@ -1535,7 +1526,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 </button>
               </div>
 
-              <div className="h-8 w-px bg-slate-200 shrink-0" />
+              <div className="hidden md:block h-8 w-px bg-slate-200 shrink-0" />
 
               {/* Filtros de Tags com Scroll Horizontal e Botão de Gerenciamento */}
               <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
@@ -1588,7 +1579,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 )}
               </div>
 
-              <div className="h-8 w-px bg-slate-200 shrink-0" />
+              <div className="hidden md:block h-8 w-px bg-slate-200 shrink-0" />
 
               {/* Dropdown de Sprint ou Botão Criar Sprint */}
               {sprints.length === 0 ? (
@@ -1600,7 +1591,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                   <span className="truncate">Criar Sprint</span>
                 </button>
               ) : (
-                <div className="relative shrink-0 w-36 sm:w-44">
+                <div className="relative shrink-0 w-full sm:w-44">
                   <button
                     onClick={() => setSprintDropdownOpen(!sprintDropdownOpen)}
                     className="flex items-center justify-between w-full gap-2 px-4 py-2.5 rounded-xl bg-[#320066] hover:bg-[#26004d] text-white font-bold text-xs border border-[#26004d] transition-all active:scale-95 uppercase tracking-wide shadow-sm"
@@ -1631,115 +1622,118 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                 </div>
               )}
 
-              <div className="h-8 w-px bg-slate-200 shrink-0" />
+              <div className="hidden md:block h-8 w-px bg-slate-200 shrink-0" />
 
-              {/* Campo de Pesquisa */}
-              <div className="relative shrink-0 w-36 sm:w-48">
-                <Search className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
-                <input
-                  type="text"
-                  placeholder="Pesquisar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
-                />
-              </div>
+              {/* Grupo de Pesquisa + Filtros e Ações */}
+              <div className="flex flex-row items-center gap-2 flex-1 min-w-[280px] sm:flex-initial">
+                {/* Campo de Pesquisa */}
+                <div className="relative flex-1 min-w-[120px] sm:w-48 sm:flex-none">
+                  <Search className="absolute left-3.5 top-3.5 text-slate-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                  />
+                </div>
 
-              {/* Filtros e customização */}
-              <div className="flex items-center gap-1.5 shrink-0 relative">
-                <button
-                  onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                  className={`p-2.5 border rounded-xl transition-colors shrink-0 flex items-center gap-1.5 ${
-                    isFilterDropdownOpen || selectedMemberFilter || selectedPriorityFilter
-                      ? 'bg-[#320066]/10 border-brand-500 text-brand-700 font-bold'
-                      : 'text-slate-500 hover:text-[#320066] hover:bg-slate-100 border-slate-200'
-                  }`}
-                  title="Filtrar Atividades"
-                >
-                  <Filter size={16} />
-                  {(selectedMemberFilter || selectedPriorityFilter) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse" />
-                  )}
-                </button>
+                {/* Filtros e customização */}
+                <div className="flex items-center gap-1.5 shrink-0 relative">
+                  <button
+                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                    className={`p-2.5 border rounded-xl transition-colors shrink-0 flex items-center gap-1.5 ${
+                      isFilterDropdownOpen || selectedMemberFilter || selectedPriorityFilter
+                        ? 'bg-[#320066]/10 border-brand-500 text-brand-700 font-bold'
+                        : 'text-slate-500 hover:text-[#320066] hover:bg-slate-100 border-slate-200'
+                    }`}
+                    title="Filtrar Atividades"
+                  >
+                    <Filter size={16} />
+                    {(selectedMemberFilter || selectedPriorityFilter) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-600 animate-pulse" />
+                    )}
+                  </button>
 
-                {isFilterDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-20"
-                      onClick={() => setIsFilterDropdownOpen(false)}
-                    />
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-30 animate-fade-in text-slate-700 text-left">
-                      <h4 className="text-xs font-bold text-[#320066] uppercase tracking-wider mb-3">Filtrar Atividades</h4>
-                      
-                      <div className="space-y-3.5">
-                        {/* Filtro por Responsável */}
-                        <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Responsável</label>
-                          <select
-                            value={selectedMemberFilter}
-                            onChange={(e) => setSelectedMemberFilter(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
-                          >
-                            <option value="">Todos</option>
-                            <option value="unassigned">Sem responsável</option>
-                            {(project.membros || []).map(m => (
-                              <option key={m.id_usuario} value={m.id_usuario}>
-                                {m.nome}
-                              </option>
-                            ))}
-                          </select>
+                  {isFilterDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setIsFilterDropdownOpen(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 z-30 animate-fade-in text-slate-700 text-left">
+                        <h4 className="text-xs font-bold text-[#320066] uppercase tracking-wider mb-3">Filtrar Atividades</h4>
+                        
+                        <div className="space-y-3.5">
+                          {/* Filtro por Responsável */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Responsável</label>
+                            <select
+                              value={selectedMemberFilter}
+                              onChange={(e) => setSelectedMemberFilter(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
+                            >
+                              <option value="">Todos</option>
+                              <option value="unassigned">Sem responsável</option>
+                              {(project.membros || []).map(m => (
+                                <option key={m.id_usuario} value={m.id_usuario}>
+                                  {m.nome}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Filtro por Prioridade */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Prioridade</label>
+                            <select
+                              value={selectedPriorityFilter}
+                              onChange={(e) => setSelectedPriorityFilter(e.target.value)}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
+                            >
+                              <option value="">Todas</option>
+                              <option value="ALTA">Alta</option>
+                              <option value="MEDIA">Média</option>
+                              <option value="BAIXA">Baixa</option>
+                            </select>
+                          </div>
+
+                          {/* Botão de Limpar */}
+                          {(selectedMemberFilter || selectedPriorityFilter || selectedTag || searchTerm) ? (
+                            <button
+                              onClick={() => {
+                                setSelectedMemberFilter('');
+                                setSelectedPriorityFilter('');
+                                setSelectedTag('');
+                                setSearchTerm('');
+                                setIsFilterDropdownOpen(false);
+                              }}
+                              className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-xl text-xs font-bold transition-all"
+                            >
+                              Limpar Filtros
+                            </button>
+                          ) : null}
                         </div>
-
-                        {/* Filtro por Prioridade */}
-                        <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase">Prioridade</label>
-                          <select
-                            value={selectedPriorityFilter}
-                            onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-semibold"
-                          >
-                            <option value="">Todas</option>
-                            <option value="ALTA">Alta</option>
-                            <option value="MEDIA">Média</option>
-                            <option value="BAIXA">Baixa</option>
-                          </select>
-                        </div>
-
-                        {/* Botão de Limpar */}
-                        {(selectedMemberFilter || selectedPriorityFilter || selectedTag || searchTerm) ? (
-                          <button
-                            onClick={() => {
-                              setSelectedMemberFilter('');
-                              setSelectedPriorityFilter('');
-                              setSelectedTag('');
-                              setSearchTerm('');
-                              setIsFilterDropdownOpen(false);
-                            }}
-                            className="w-full text-center py-2 bg-slate-100 hover:bg-slate-200 text-slate-655 rounded-xl text-xs font-bold transition-all"
-                          >
-                            Limpar Filtros
-                          </button>
-                        ) : null}
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
 
-                <button
-                  onClick={() => setIsActivityLogsModalOpen(true)}
-                  className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
-                  title="Histórico de Atividades do Projeto"
-                >
-                  <History size={16} />
-                </button>
+                  <button
+                    onClick={() => setIsActivityLogsModalOpen(true)}
+                    className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                    title="Histórico de Atividades do Projeto"
+                  >
+                    <History size={16} />
+                  </button>
 
-                <button
-                  onClick={() => setIsBoardConfigModalOpen(true)}
-                  className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
-                  title="Configurar Quadro (Colunas e Etiquetas)"
-                >
-                  <Sliders size={16} />
-                </button>
+                  <button
+                    onClick={() => setIsBoardConfigModalOpen(true)}
+                    className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
+                    title="Configurar Quadro (Colunas e Etiquetas)"
+                  >
+                    <Sliders size={16} />
+                  </button>
+                </div>
               </div>
 
             </div>
