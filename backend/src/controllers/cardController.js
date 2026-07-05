@@ -15,7 +15,7 @@ export const anonymizeVotes = (card, currentUserEmail, userPerfil) => {
   if (!poker || !poker.active || !poker.expiresAt) return card;
 
   const isExpired = new Date(poker.expiresAt) <= new Date();
-  const canSeeDetailed = isExpired && (userPerfil === "PO" || userPerfil === "GERENTE" || userPerfil === "ADMIN");
+  const canSeeDetailed = isExpired && (userPerfil === "PO" || userPerfil === "GERENTE");
 
   if (!canSeeDetailed) {
     card.votos = card.votos.map(v => {
@@ -337,7 +337,7 @@ export const atualizarCard = async (req, res) => {
       });
     }
 
-    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isGerente = membro.perfil === "GERENTE";
     const isPO = membro.perfil === "PO";
     const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
 
@@ -551,7 +551,7 @@ export const excluirCard = async (req, res) => {
       });
     }
 
-    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isGerente = membro.perfil === "GERENTE";
     const isPO = membro.perfil === "PO";
     const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
 
@@ -791,8 +791,7 @@ export const reordenarCards = async (req, res) => {
       });
     }
 
-    const isGerente =
-      membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isGerente = membro.perfil === "GERENTE";
 
     const isPO = membro.perfil === "PO";
 
@@ -881,7 +880,7 @@ export const aprovarCard = async (req, res) => {
       });
     }
 
-    if (!["TESTER", "GERENTE", "ADMIN"].includes(membro.perfil)) {
+    if (!["TESTER", "GERENTE"].includes(membro.perfil)) {
       return res.status(403).json({
         error: "Somente Tester, Gerente ou Admin podem aprovar."
       });
@@ -1000,7 +999,7 @@ export const reprovarCard = async (req, res) => {
 
     }
 
-    if (!["TESTER","GERENTE","ADMIN"].includes(membro.perfil)) {
+    if (!["TESTER","GERENTE"].includes(membro.perfil)) {
 
       return res.status(403).json({
         error: "Somente Tester, Gerente ou Admin podem reprovar."
@@ -1162,7 +1161,7 @@ export const sinalizarRiscoCard = async (req, res) => {
       return res.status(403).json({ error: "Acesso negado: você não é membro deste projeto" });
     }
 
-    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isGerente = membro.perfil === "GERENTE";
     const isPO = membro.perfil === "PO";
     const isResponsavel = card.id_responsavel === membro.id_usuario;
 
@@ -1196,7 +1195,7 @@ export const sinalizarRiscoCard = async (req, res) => {
           where: {
             id_projeto: card.id_projeto,
             perfil: {
-              in: ["GERENTE", "ADMIN", "PO"]
+              in: ["GERENTE", "PO"]
             }
           },
           include: { usuario: true }

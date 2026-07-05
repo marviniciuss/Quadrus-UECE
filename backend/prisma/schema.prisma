@@ -8,7 +8,6 @@ generator client {
 }
 
 enum Perfil {
-  ADMIN
   GERENTE
   PO
   DEV

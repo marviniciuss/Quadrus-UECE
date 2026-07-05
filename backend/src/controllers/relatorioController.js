@@ -2,12 +2,12 @@ import prisma from "../lib/prisma.js";
 import { obterMembroProjeto } from "../utils/projetoAuth.js";
 
 /**
- * Validar Acesso de Gerente
+ * Validar Acesso de Membro
  */
-const validarAcessoGerente = async (projectId, email) => {
+const validarAcessoMembro = async (projectId, email) => {
   const membro = await obterMembroProjeto(projectId, email);
-  if (!membro || membro.perfil !== "GERENTE") {
-    throw new Error("Acesso negado: Apenas o GERENTE pode acessar os relatórios");
+  if (!membro) {
+    throw new Error("Acesso negado: Apenas membros do projeto podem acessar os relatórios");
   }
   return membro;
 };
@@ -20,7 +20,7 @@ export const obterRDA = async (req, res) => {
   const { projectId } = req.params;
 
   try {
-    await validarAcessoGerente(projectId, req.user.email);
+    await validarAcessoMembro(projectId, req.user.email);
 
     // Buscar cards concluídos do projeto e seu último log de movimentação
     const cardsConcluidos = await prisma.card.findMany({
@@ -93,7 +93,7 @@ export const obterVelocity = async (req, res) => {
   const { agrupamento = "sprint" } = req.query; // 'sprint', 'dia', 'semana'
 
   try {
-    await validarAcessoGerente(projectId, req.user.email);
+    await validarAcessoMembro(projectId, req.user.email);
 
     const cardsConcluidos = await prisma.card.findMany({
       where: {

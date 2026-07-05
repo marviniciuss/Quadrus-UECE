@@ -3,7 +3,6 @@ import {
   Bell,
   HelpCircle,
   ChevronDown,
-  LogOut,
   CheckCheck
 } from 'lucide-react';
 import axios from 'axios';
@@ -536,14 +535,6 @@ export default function App() {
             <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight whitespace-nowrap truncate max-w-[120px]">
               {dbUser?.nome || userDisplayName}
             </span>
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="p-2 ml-1 border-l border-slate-200 text-slate-400 hover:text-rose-600 transition-colors focus:outline-none shrink-0"
-            title="Sair da Sessão"
-          >
-            <LogOut size={20} />
           </button>
 
         </div>

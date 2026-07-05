@@ -47,12 +47,12 @@ const processarExpiracaoPoker = async (cardId, io) => {
     // Verificar se já não foi decidida a pontuação
     if (card.story_points !== null) return;
 
-    // Buscar PO, GERENTE e ADMIN do projeto para notificar
+    // Buscar PO e GERENTE do projeto para notificar
     const membrosNotificar = await prisma.membroProjeto.findMany({
       where: {
         id_projeto: card.id_projeto,
         perfil: {
-          in: ["PO", "GERENTE", "ADMIN"]
+          in: ["PO", "GERENTE"]
         }
       },
       include: { usuario: true }
@@ -211,12 +211,12 @@ export const verificarEEncerrarPokerAutomatico = async (cardId, io) => {
         data: { descricao: novaDescricao }
       });
 
-      // Buscar PO, GERENTE e ADMIN do projeto para notificar
+      // Buscar PO e GERENTE do projeto para notificar
       const membrosNotificar = await prisma.membroProjeto.findMany({
         where: {
           id_projeto: card.id_projeto,
           perfil: {
-            in: ["PO", "GERENTE", "ADMIN"]
+            in: ["PO", "GERENTE"]
           }
         },
         include: { usuario: true }

@@ -206,7 +206,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const [creatingSprint, setCreatingSprint] = useState(false);
 
   const isManager = (project.membros || []).some(
-    m => (m.perfil === 'GERENTE' || m.perfil === 'ADMIN') && m.usuario?.email === currentUserEmail
+    m => m.perfil === 'GERENTE' && m.usuario?.email === currentUserEmail
   );
 
   const isPO = (project.membros || []).some(
@@ -1457,18 +1457,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <span className="whitespace-nowrap">Planejamento de Sprint</span>
             </button>
 
-            {isManager && (
-              <button
-                onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
-                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                  }`}
-              >
-                <TrendingUp size={18} />
-                <span className="whitespace-nowrap">Métricas</span>
-              </button>
-            )}
+            <button
+              onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
+              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
+                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}
+            >
+              <TrendingUp size={18} />
+              <span className="whitespace-nowrap">Métricas</span>
+            </button>
 
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
@@ -2545,7 +2543,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               </div>
             );
           })()
-        ) : activeTab === 'metrics' && isManager ? (
+        ) : activeTab === 'metrics' ? (
           /* ================= TELA MÉTRICAS ================= */
           <div className="flex-1 overflow-y-auto no-scrollbar pb-10 mt-6">
              <RelatoriosPage projectId={project.id_projeto} sprints={sprints} />
@@ -2646,6 +2644,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                   onChange={(e) => handleUpdateMemberProfile(m.id_usuario, e.target.value)}
                                   className="text-xs font-bold px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700 outline-none hover:border-brand-300 focus:border-brand-500 transition-all cursor-pointer"
                                 >
+                                  <option value="GERENTE">GERENTE</option>
                                   <option value="PO">PO</option>
                                   <option value="DEV">DEV</option>
                                   <option value="TESTER">TESTER</option>

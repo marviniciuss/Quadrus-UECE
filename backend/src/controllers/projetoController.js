@@ -2,7 +2,7 @@ import prisma from "../lib/prisma.js";
 import { garantirCustomizacaoInicial } from "../utils/garantirCustomizacaoInicial.js";
 
 // Perfis válidos do sistema
-const PERFIS_VALIDOS = ['ADMIN', 'GERENTE', 'PO', 'DEV', 'TESTER'];
+const PERFIS_VALIDOS = ['GERENTE', 'PO', 'DEV', 'TESTER'];
 
 /* =========================
    LISTAR PROJETOS
@@ -204,7 +204,7 @@ export const atualizarProjeto = async (req, res) => {
 
     const emailUsuario = req.user.email;
     const isGerente = projetoExistente.membros.some(
-      (membro) => membro.usuario.email === emailUsuario && (membro.perfil === 'GERENTE' || membro.perfil === 'ADMIN')
+      (membro) => membro.usuario.email === emailUsuario && membro.perfil === 'GERENTE'
     );
 
     if (!isGerente) {
@@ -294,7 +294,7 @@ export const adicionarMembro = async (req, res) => {
 
     const emailUsuarioLogado = req.user.email;
     const canInvite = projeto.membros.some(
-      (membro) => membro.usuario.email === emailUsuarioLogado && (membro.perfil === 'GERENTE' || membro.perfil === 'ADMIN' || membro.perfil === 'PO')
+      (membro) => membro.usuario.email === emailUsuarioLogado && (membro.perfil === 'GERENTE' || membro.perfil === 'PO')
     );
 
     if (!canInvite) {
@@ -394,7 +394,7 @@ export const removerMembro = async (req, res) => {
 
     const emailUsuarioLogado = req.user.email;
     const isGerente = projeto.membros.some(
-      (membro) => membro.usuario.email === emailUsuarioLogado && (membro.perfil === 'GERENTE' || membro.perfil === 'ADMIN')
+      (membro) => membro.usuario.email === emailUsuarioLogado && membro.perfil === 'GERENTE'
     );
 
     if (!isGerente) {
@@ -449,7 +449,7 @@ export const atualizarMembro = async (req, res) => {
 
     const emailUsuarioLogado = req.user.email;
     const isGerente = projeto.membros.some(
-      (membro) => membro.usuario.email === emailUsuarioLogado && (membro.perfil === 'GERENTE' || membro.perfil === 'ADMIN')
+      (membro) => membro.usuario.email === emailUsuarioLogado && membro.perfil === 'GERENTE'
     );
 
     if (!isGerente) {

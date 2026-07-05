@@ -655,7 +655,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const meuMembro = project.membros?.find(m => m.usuario?.email === currentUserEmail);
   const isDev = meuMembro?.perfil === 'DEV';
   const isPO = meuMembro?.perfil === 'PO';
-  const isGerente = meuMembro?.perfil === 'GERENTE' || meuMembro?.perfil === 'ADMIN';
+  const isGerente = meuMembro?.perfil === 'GERENTE';
   const isTester = meuMembro?.perfil === 'TESTER';
   const isAuthorizedToHomologate = isTester || isGerente;
 

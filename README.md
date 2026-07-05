@@ -8,7 +8,7 @@ O **Quadrus** é uma plataforma moderna e intuitiva de gestão ágil (Kanban) pr
 
 1. **Quadro Kanban em Tempo Real:** Sincronização automática via WebSockets (`Socket.io`) ao arrastar cartões pelas colunas (`A Fazer`, `Em Andamento`, `Homologação`, `Concluído`).
 2. **Automação de Sprint:** Migração inteligente e automática de tarefas inacabadas para o próximo ciclo ativo ao encerrar uma sprint.
-3. **Gestão Multi-Tenant de Cargos:** Níveis de acesso flexíveis (`ADMIN`, `GERENTE`, `PO`, `DEV`, `TESTER`) definidos dinamicamente por projeto.
+3. **Gestão Multi-Tenant de Cargos:** Níveis de acesso flexíveis (`GERENTE`, `PO`, `DEV`, `TESTER`) definidos dinamicamente por projeto.
 4. **Planning Poker Integrado:** Sessões assíncronas de votação Fibonacci com votos mantidos em segredo até a revelação e consolidação final moderada pelo PO.
 5. **Logs de Governança (RDA & Velocity):** Geração automática de Relatórios Diários de Atividades (RDA) e cálculos de Velocity das sprints a partir de um log imutável de eventos.
 6. **Soft Delete de Tarefas:** Exclusão lógica de cartões para preservar o histórico de auditoria e métricas.
