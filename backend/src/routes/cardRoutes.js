@@ -8,6 +8,7 @@ import {
   excluirCard,
   atualizarStatusCard,
   reordenarCards,
+  sinalizarRiscoCard,
 } from "../controllers/cardController.js";
 
 const router = express.Router();
@@ -32,5 +33,8 @@ router.delete("/cards/:id", verifyFirebaseToken, excluirCard);
 router.patch("/cards/:id/status", verifyFirebaseToken, atualizarStatusCard);
 
 router.patch("/cards/:id/reordenar", verifyFirebaseToken, reordenarCards);
+
+// Sinalizar risco de atraso no card
+router.patch("/cards/:id/risco", verifyFirebaseToken, sinalizarRiscoCard);
 
 export default router;

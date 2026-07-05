@@ -827,3 +827,121 @@ export const reordenarCards = async (req, res) => {
     });
   }
 };
+
+/* =========================
+   SINALIZAR RISCO (US05.04)
+========================= */
+export const sinalizarRiscoCard = async (req, res) => {
+  const { id } = req.params;
+  const { em_risco, nova_descricao } = req.body;
+
+  try {
+    const card = await prisma.card.findUnique({
+      where: { id_card: id },
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: "Card não encontrado" });
+    }
+
+    // Controle de Acesso: Verificar se o usuário pertence ao projeto do card
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({ error: "Acesso negado: você não é membro deste projeto" });
+    }
+
+    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isPO = membro.perfil === "PO";
+    const isResponsavel = card.id_responsavel === membro.id_usuario;
+
+    // Apenas Gerente, PO ou o Responsável podem sinalizar risco
+    if (!isGerente && !isPO && !isResponsavel) {
+      return res.status(403).json({
+        error: "Acesso negado: apenas o Responsável pelo card, Gerente ou PO podem sinalizar risco.",
+      });
+    }
+
+    // Atualiza o card
+    const cardAtualizado = await prisma.card.update({
+      where: { id_card: id },
+      data: {
+        em_risco,
+        ...(nova_descricao !== undefined && { descricao: nova_descricao }),
+      },
+      include: {
+        responsavel: true,
+        sprint: true,
+        etiquetas: true,
+      },
+    });
+
+    const io = req.app.get('io');
+
+    // Notificar Gerentes e PO caso esteja ativando o risco
+    if (em_risco && em_risco !== card.em_risco) {
+      try {
+        const gestores = await prisma.membroProjeto.findMany({
+          where: {
+            id_projeto: card.id_projeto,
+            perfil: {
+              in: ["GERENTE", "ADMIN", "PO"]
+            }
+          },
+          include: { usuario: true }
+        });
+
+        const mensagem = `⚠️ A tarefa "${cardAtualizado.titulo}" foi sinalizada como em risco de atraso por ${membro.usuario.nome}.`;
+
+        for (const gestor of gestores) {
+          if (gestor.id_usuario === membro.id_usuario) continue; // Não notificar a si mesmo se o PO sinalizou
+
+          const notificacao = await prisma.notificacao.create({
+            data: {
+              id_usuario_destino: gestor.id_usuario,
+              id_card_origem: cardAtualizado.id_card,
+              mensagem
+            },
+            include: {
+              card: {
+                select: {
+                  id_card: true,
+                  titulo: true,
+                  status: true,
+                  id_projeto: true
+                }
+              }
+            }
+          });
+
+          if (io) {
+            io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+          }
+        }
+      } catch (errNotif) {
+        console.error("Erro ao notificar gestores sobre risco:", errNotif);
+      }
+    }
+
+    // Log de Ação
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: em_risco 
+        ? `Sinalizou risco de atraso no card "${cardAtualizado.titulo}"` 
+        : `Removeu sinal de risco do card "${cardAtualizado.titulo}"`,
+      tipo_acao: "ALERTA",
+      id_card: cardAtualizado.id_card,
+      id_sprint: cardAtualizado.id_sprint,
+    });
+
+    // Emissão socket geral de atualização do card
+    if (io) {
+      const cardToEmit = { ...cardAtualizado, votos: [] }; // Removendo votos caso a view precise anonimizar
+      io.to(card.id_projeto).emit('card_moved', cardToEmit);
+    }
+
+    return res.json(cardAtualizado);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao atualizar status de risco do card" });
+  }
+};
