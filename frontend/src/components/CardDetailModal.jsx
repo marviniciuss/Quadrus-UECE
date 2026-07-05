@@ -69,6 +69,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const [tempTitle, setTempTitle] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionComment, setRejectionComment] = useState('');
+  const [showRiscoInput, setShowRiscoInput] = useState(false);
+  const [riscoJustificativa, setRiscoJustificativa] = useState('');
 
   // --- Helpers de Parse e Serialização (Markdown + Metadata) ---
   const parseCardDesc = (desc) => {
@@ -572,6 +574,50 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     }
   };
 
+  const handleToggleRisco = async () => {
+    if (!selectedCard) return;
+    
+    try {
+      const isActivating = !selectedCard.em_risco;
+      
+      let updatedDesc = selectedCard.descricao;
+      if (isActivating) {
+        if (!riscoJustificativa.trim()) {
+          showToast("A justificativa é obrigatória.", "error");
+          return;
+        }
+        const parsed = parseCardDesc(selectedCard.descricao);
+        const meuMembro = project.membros?.find(m => m.usuario?.email === currentUserEmail);
+        const autorNome = meuMembro?.usuario?.nome || currentUserEmail.split('@')[0];
+        const autorFoto = meuMembro?.usuario?.foto || null;
+        
+        const newComment = {
+          id_comentario: Date.now().toString(),
+          autor: autorNome,
+          foto: autorFoto,
+          texto: `⚠️ *SINALIZOU ATRASO:* ${riscoJustificativa.trim()}`,
+          createdAt: new Date().toISOString()
+        };
+        const updatedComments = [...parsed.comments, newComment];
+        updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, parsed.poker, updatedComments);
+      }
+      
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}/risco`, {
+        em_risco: isActivating,
+        nova_descricao: updatedDesc
+      });
+      
+      setSelectedCard(res.data);
+      setShowRiscoInput(false);
+      setRiscoJustificativa('');
+      await reloadCardDetail(selectedCard.id_card);
+      showToast(isActivating ? "Risco de atraso sinalizado com sucesso!" : "Sinal de atraso removido.", "success");
+    } catch (err) {
+      console.error("Erro ao atualizar status de risco:", err);
+      showToast(err.response?.data?.error || "Erro ao atualizar status de risco.", "error");
+    }
+  };
+
   const handleToggleCardEtiqueta = async (idEtiqueta) => {
     if (!selectedCard) return;
     const currentEtIds = selectedCard.etiquetas?.map(et => et.id_etiqueta) || [];
@@ -627,6 +673,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
   const canManagePoker = isPO || isGerente;
   const canEditOrDelete = isGerente || isPO || !selectedCard.id_criador || selectedCard.id_criador === meuMembro?.id_usuario;
+  const canSignalRisco = isGerente || isPO || selectedCard.id_responsavel === meuMembro?.id_usuario;
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-700">
@@ -1260,17 +1307,55 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             </div>
 
             {/* Sinalizar Atraso */}
-            <button
-              onClick={() => handleUpdateCardField('em_risco', !selectedCard.em_risco)}
-              disabled={!canEditOrDelete}
-              className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${selectedCard.em_risco
-                  ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50'
-                  : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/10'
-                } disabled:opacity-75 disabled:cursor-not-allowed`}
-            >
-              <AlertTriangle size={14} />
-              {selectedCard.em_risco ? 'Remover Sinal de Atraso' : 'Sinalizar Atraso'}
-            </button>
+            <div className="space-y-2">
+              {!showRiscoInput || selectedCard.em_risco ? (
+                <button
+                  onClick={() => {
+                    if (selectedCard.em_risco) {
+                      handleToggleRisco();
+                    } else {
+                      setShowRiscoInput(true);
+                    }
+                  }}
+                  disabled={!canSignalRisco}
+                  className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${
+                    selectedCard.em_risco 
+                      ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50' 
+                      : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/10'
+                  } disabled:opacity-75 disabled:cursor-not-allowed`}
+                >
+                  <AlertTriangle size={14} />
+                  {selectedCard.em_risco ? 'Remover Sinal de Atraso' : 'Sinalizar Atraso'}
+                </button>
+              ) : (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2 animate-fade-in">
+                  <label className="block text-[10px] font-bold text-orange-800 uppercase">
+                    Justificativa de Atraso
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={riscoJustificativa}
+                    onChange={(e) => setRiscoJustificativa(e.target.value)}
+                    placeholder="Descreva o motivo do bloqueio/atraso..."
+                    className="w-full bg-white border border-orange-200 rounded-lg p-2 text-xs focus:outline-none focus:border-orange-500 text-slate-700"
+                  />
+                  <div className="flex gap-1.5 justify-end mt-1">
+                    <button
+                      onClick={() => { setShowRiscoInput(false); setRiscoJustificativa(''); }}
+                      className="px-2.5 py-1.5 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-lg text-[10px] font-bold transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleToggleRisco}
+                      className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-sm"
+                    >
+                      Confirmar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
           </div>
 

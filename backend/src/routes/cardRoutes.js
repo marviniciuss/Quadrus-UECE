@@ -10,6 +10,7 @@ import {
   reordenarCards,
   aprovarCard,
   reprovarCard,
+  sinalizarRiscoCard,
 } from "../controllers/cardController.js";
 
 const router = express.Router();
@@ -41,5 +42,8 @@ router.patch("/cards/:id/aprovar", verifyFirebaseToken, aprovarCard);
 
 // Reprovar card (Tester → Em Andamento)
 router.patch("/cards/:id/reprovar", verifyFirebaseToken, reprovarCard);
+
+// Sinalizar risco de atraso no card
+router.patch("/cards/:id/risco", verifyFirebaseToken, sinalizarRiscoCard);
 
 export default router;
