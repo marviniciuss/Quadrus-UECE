@@ -83,7 +83,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Pesquisar projeto..."
+                        placeholder="Pesquisar quadro..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 shadow-sm"

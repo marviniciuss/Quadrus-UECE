@@ -344,14 +344,14 @@ export default function App() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs border border-brand-200 transition-all active:scale-95 whitespace-nowrap shrink-0"
               >
-                <span>Selecionar projeto</span>
+                <span>Selecionar quadro</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {dropdownOpen && (
                 <div className="absolute left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50 animate-fade-in text-left">
                   <div className="px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
-                    Selecionar Projeto
+                    Selecionar Quadro
                   </div>
                   <div className="max-h-64 overflow-y-auto">
                     <button
@@ -361,7 +361,7 @@ export default function App() {
                       }}
                       className="w-full text-left px-4 py-2.5 text-xs font-bold text-brand-600 hover:bg-brand-50 transition-colors"
                     >
-                      Ver todos os projetos (Lista)
+                      Ver todos os quadros (Lista)
                     </button>
                     {projects.map((project) => (
                       <button
@@ -504,6 +504,14 @@ export default function App() {
             <span className="hidden md:inline text-xs font-bold text-slate-700 uppercase tracking-tight whitespace-nowrap truncate max-w-[120px]">
               {dbUser?.nome || userDisplayName}
             </span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="p-2 ml-1 border-l border-slate-200 text-slate-400 hover:text-rose-600 transition-colors focus:outline-none shrink-0"
+            title="Sair da Sessão"
+          >
+            <LogOut size={20} />
           </button>
 
         </div>
