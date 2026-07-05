@@ -576,10 +576,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
   const handleToggleRisco = async () => {
     if (!selectedCard) return;
-    
+
     try {
       const isActivating = !selectedCard.em_risco;
-      
+
       let updatedDesc = selectedCard.descricao;
       if (isActivating) {
         if (!riscoJustificativa.trim()) {
@@ -590,7 +590,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
         const meuMembro = project.membros?.find(m => m.usuario?.email === currentUserEmail);
         const autorNome = meuMembro?.usuario?.nome || currentUserEmail.split('@')[0];
         const autorFoto = meuMembro?.usuario?.foto || null;
-        
+
         const newComment = {
           id_comentario: Date.now().toString(),
           autor: autorNome,
@@ -601,12 +601,12 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
         const updatedComments = [...parsed.comments, newComment];
         updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, parsed.poker, updatedComments);
       }
-      
+
       const res = await api.patch(`/api/cards/${selectedCard.id_card}/risco`, {
         em_risco: isActivating,
         nova_descricao: updatedDesc
       });
-      
+
       setSelectedCard(res.data);
       setShowRiscoInput(false);
       setRiscoJustificativa('');
@@ -1207,8 +1207,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                       key={et.id_etiqueta}
                       onClick={() => canEditOrDelete && handleToggleCardEtiqueta(et.id_etiqueta)}
                       className={`px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${isSelected
-                          ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
-                          : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
+                        ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
+                        : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
                         } ${!canEditOrDelete ? 'opacity-75 cursor-not-allowed' : ''}`}
                     >
                       {et.nome}
@@ -1318,11 +1318,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                     }
                   }}
                   disabled={!canSignalRisco}
-                  className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${
-                    selectedCard.em_risco 
-                      ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50' 
+                  className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${selectedCard.em_risco
+                      ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50'
                       : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/10'
-                  } disabled:opacity-75 disabled:cursor-not-allowed`}
+                    } disabled:opacity-75 disabled:cursor-not-allowed`}
                 >
                   <AlertTriangle size={14} />
                   {selectedCard.em_risco ? 'Remover Sinal de Atraso' : 'Sinalizar Atraso'}
@@ -1356,6 +1355,9 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                 </div>
               )}
             </div>
+
+            {/* Espaçador para evitar que o conteúdo seja cortado ao rolar */}
+            <div className="h-8" />
 
           </div>
 
