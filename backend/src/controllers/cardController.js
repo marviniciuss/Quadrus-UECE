@@ -962,4 +962,120 @@ export const sinalizarRiscoCard = async (req, res) => {
     console.error(error);
     return res.status(500).json({ error: "Erro ao atualizar status de risco do card" });
   }
+};
+
+/* =========================
+   REPROVAR CARD (US06.02)
+========================= */
+export const reprovarCard = async (req, res) => {
+  const { id } = req.params;
+  const { nova_descricao } = req.body;
+
+  try {
+    const card = await prisma.card.findUnique({
+      where: { id_card: id },
+    });
+
+    if (!card) {
+      return res.status(404).json({ error: "Card não encontrado" });
+    }
+
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+    if (!membro) {
+      return res.status(403).json({ error: "Acesso negado: você não é membro deste projeto" });
+    }
+
+    const isGerente = membro.perfil === "GERENTE" || membro.perfil === "ADMIN";
+    const isPO = membro.perfil === "PO";
+    const isTester = membro.perfil === "TESTER";
+
+    if (!isGerente && !isPO && !isTester) {
+      return res.status(403).json({
+        error: "Acesso negado: apenas Testers e Gestores podem reprovar uma entrega.",
+      });
+    }
+
+    // Buscar a coluna 'EM ANDAMENTO'
+    const targetColuna = await prisma.coluna.findFirst({
+      where: { id_projeto: card.id_projeto, nome: "EM ANDAMENTO" },
+    });
+
+    if (!targetColuna) {
+      return res.status(400).json({ error: "Coluna de 'Em Andamento' não encontrada no projeto" });
+    }
+
+    // Adiciona a tag "Retrabalho" se ainda não existir
+    const newTags = [...card.tags];
+    if (!newTags.includes("Retrabalho")) {
+      newTags.push("Retrabalho");
+    }
+
+    // Atualiza o card
+    const cardAtualizado = await prisma.card.update({
+      where: { id_card: id },
+      data: {
+        id_coluna: targetColuna.id_coluna,
+        status: "EM_ANDAMENTO",
+        tags: newTags,
+        ...(nova_descricao !== undefined && { descricao: nova_descricao }),
+      },
+      include: {
+        responsavel: true,
+        sprint: true,
+        etiquetas: true,
+      },
+    });
+
+    const io = req.app.get('io');
+
+    // Notificar o desenvolvedor responsável
+    if (card.id_responsavel && card.id_responsavel !== membro.id_usuario) {
+      try {
+        const mensagem = `❌ O card "${cardAtualizado.titulo}" foi reprovado e precisa de retrabalho.`;
+        
+        const notificacao = await prisma.notificacao.create({
+          data: {
+            id_usuario_destino: card.id_responsavel,
+            id_card_origem: cardAtualizado.id_card,
+            mensagem
+          },
+          include: {
+            card: {
+              select: {
+                id_card: true,
+                titulo: true,
+                status: true,
+                id_projeto: true
+              }
+            }
+          }
+        });
+
+        if (io) {
+          io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+        }
+      } catch (errNotif) {
+        console.error("Erro ao notificar desenvolvedor sobre reprovação:", errNotif);
+      }
+    }
+
+    // Log de Ação
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      acao: `Reprovou e devolveu o card "${cardAtualizado.titulo}" para Em Andamento (Retrabalho)`,
+      tipo_acao: "MOVIMENTACAO",
+      id_card: cardAtualizado.id_card,
+      id_sprint: cardAtualizado.id_sprint,
+    });
+
+    // Emissão socket geral
+    if (io) {
+      io.to(card.id_projeto).emit('card_moved', cardAtualizado);
+    }
+
+    return res.json(cardAtualizado);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao reprovar card" });
+  }
 };

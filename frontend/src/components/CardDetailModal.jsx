@@ -71,6 +71,9 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   
   const [showRiscoInput, setShowRiscoInput] = useState(false);
   const [riscoJustificativa, setRiscoJustificativa] = useState('');
+  
+  const [showReprovarInput, setShowReprovarInput] = useState(false);
+  const [reprovarJustificativa, setReprovarJustificativa] = useState('');
 
   // --- Helpers de Parse e Serialização (Markdown + Metadata) ---
   const parseCardDesc = (desc) => {
@@ -560,6 +563,45 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     } catch (err) {
       console.error("Erro ao atualizar status de risco:", err);
       showToast(err.response?.data?.error || "Erro ao atualizar status de risco.", "error");
+    }
+  };
+
+  const handleReprovarCard = async () => {
+    if (!selectedCard) return;
+    if (!reprovarJustificativa.trim()) {
+      showToast("Os passos para reproduzir o erro são obrigatórios.", "error");
+      return;
+    }
+    
+    try {
+      const parsed = parseCardDesc(selectedCard.descricao);
+      const meuMembro = project.membros?.find(m => m.usuario?.email === currentUserEmail);
+      const autorNome = meuMembro?.usuario?.nome || currentUserEmail.split('@')[0];
+      const autorFoto = meuMembro?.usuario?.foto || null;
+      
+      const newComment = {
+        id_comentario: Date.now().toString(),
+        autor: autorNome,
+        foto: autorFoto,
+        texto: `❌ *REPROVADO - PASSOS DO ERRO:*\n\n${reprovarJustificativa.trim()}`,
+        createdAt: new Date().toISOString()
+      };
+      const updatedComments = [...parsed.comments, newComment];
+      const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, parsed.poker, updatedComments);
+      
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}/reprovar`, {
+        nova_descricao: updatedDesc
+      });
+      
+      setSelectedCard(res.data);
+      setShowReprovarInput(false);
+      setReprovarJustificativa('');
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Card reprovado e devolvido para Em Andamento.", "success");
+      onClose();
+    } catch (err) {
+      console.error("Erro ao reprovar card:", err);
+      showToast(err.response?.data?.error || "Erro ao reprovar card.", "error");
     }
   };
 
@@ -1160,28 +1202,67 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               )}
             </div>
 
-            {/* Botão de Aprovação por Tester */}
+            {/* Botão de Aprovação e Reprovação por Tester */}
             {selectedCard.status === 'HOMOLOGACAO' && (isTester || isGerente || isPO) && (
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await api.patch(`/api/cards/${selectedCard.id_card}/status`, {
-                      status: 'CONCLUIDO'
-                    });
-                    setSelectedCard(res.data);
-                    await reloadCardDetail(selectedCard.id_card);
-                    showToast("Entrega aprovada com sucesso!", "success");
-                    onClose(); // Opcional: fechar modal após aprovar
-                  } catch (err) {
-                    console.error("Erro ao aprovar card:", err);
-                    showToast("Erro ao aprovar entrega.", "error");
-                  }
-                }}
-                className="w-full py-3 mb-2 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-              >
-                <CheckCircle2 size={16} />
-                Aprovar Entrega
-              </button>
+              <div className="space-y-2 mb-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.patch(`/api/cards/${selectedCard.id_card}/status`, {
+                        status: 'CONCLUIDO'
+                      });
+                      setSelectedCard(res.data);
+                      await reloadCardDetail(selectedCard.id_card);
+                      showToast("Entrega aprovada com sucesso!", "success");
+                      onClose(); // Opcional: fechar modal após aprovar
+                    } catch (err) {
+                      console.error("Erro ao aprovar card:", err);
+                      showToast("Erro ao aprovar entrega.", "error");
+                    }
+                  }}
+                  className="w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+                >
+                  <CheckCircle2 size={16} />
+                  Aprovar Entrega
+                </button>
+
+                {!showReprovarInput ? (
+                  <button
+                    onClick={() => setShowReprovarInput(true)}
+                    className="w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50"
+                  >
+                    <AlertTriangle size={16} />
+                    Reprovar Entrega
+                  </button>
+                ) : (
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-2 animate-fade-in">
+                    <label className="block text-[10px] font-bold text-rose-800 uppercase">
+                      Passos para reproduzir o erro (Markdown)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={reprovarJustificativa}
+                      onChange={(e) => setReprovarJustificativa(e.target.value)}
+                      placeholder="Ex: 1. Clique em X... 2. O erro Y acontece..."
+                      className="w-full bg-white border border-rose-200 rounded-lg p-2 text-xs focus:outline-none focus:border-rose-500 text-slate-700"
+                    />
+                    <div className="flex gap-1.5 justify-end mt-1">
+                      <button
+                        onClick={() => { setShowReprovarInput(false); setReprovarJustificativa(''); }}
+                        className="px-2.5 py-1.5 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-[10px] font-bold transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleReprovarCard}
+                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-bold transition-colors shadow-sm"
+                      >
+                        Confirmar Reprovação
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Sinalizar Atraso */}

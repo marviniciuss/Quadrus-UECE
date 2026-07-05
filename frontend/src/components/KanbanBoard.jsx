@@ -1973,12 +1973,26 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                     )}
                                   </div>
 
-                                  {/* Etiquetas do Card (limite a 1) */}
-                                  {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
-                                    <span className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent truncate max-w-[120px]">
-                                      {card.etiquetas && card.etiquetas.length > 0 ? card.etiquetas[0].nome : card.tags[0]}
-                                    </span>
-                                  )}
+                                  {/* Etiquetas e Tags do Card */}
+                                  <div className="flex flex-wrap gap-1">
+                                    {(card.etiquetas || []).map((et, idx) => (
+                                      <span key={`et-${idx}`} className="text-[9px] font-bold bg-[#EAECEF] text-[#475569] px-2 py-0.5 rounded border border-transparent truncate max-w-[80px]">
+                                        {et.nome}
+                                      </span>
+                                    ))}
+                                    {(card.tags || []).map((tag, idx) => (
+                                      <span 
+                                        key={`tag-${idx}`} 
+                                        className={`text-[9px] font-bold px-2 py-0.5 rounded border truncate max-w-[80px] ${
+                                          tag.toUpperCase() === 'RETRABALHO' 
+                                            ? 'bg-rose-100 text-rose-700 border-rose-200' 
+                                            : 'bg-[#EAECEF] text-[#475569] border-transparent'
+                                        }`}
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
 
                                 {/* Metadados do card */}
