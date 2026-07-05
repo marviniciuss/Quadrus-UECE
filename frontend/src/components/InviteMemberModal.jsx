@@ -194,10 +194,10 @@ export default function InviteMemberModal({ isOpen, onClose, project, onUpdatePr
               onChange={(e) => setInvitePerfil(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-bold"
             >
-              <option value="DEV">DEV (Desenvolvedor)</option>
-              <option value="PO">PO (Product Owner)</option>
-              <option value="TESTER">TESTER</option>
               <option value="GERENTE">GERENTE</option>
+              <option value="PO">PO (Product Owner)</option>
+              <option value="DEV">DEV (Desenvolvedor)</option>
+              <option value="TESTER">TESTER (Analista de Testes)</option>
             </select>
           </div>
 

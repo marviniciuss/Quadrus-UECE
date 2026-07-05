@@ -5,6 +5,7 @@ import CardDetailModal from './CardDetailModal.jsx';
 import BoardConfigModal from './BoardConfigModal.jsx';
 import InviteMemberModal from './InviteMemberModal.jsx';
 import ActivityLogsModal from './ActivityLogsModal.jsx';
+import RelatoriosPage from './RelatoriosPage.jsx';
 import {
   FolderKanban,
   Calendar,
@@ -205,7 +206,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const [creatingSprint, setCreatingSprint] = useState(false);
 
   const isManager = (project.membros || []).some(
-    m => m.perfil === 'GERENTE' && m.usuario?.email === currentUserEmail
+    m => (m.perfil === 'GERENTE' || m.perfil === 'ADMIN') && m.usuario?.email === currentUserEmail
   );
 
   const isPO = (project.membros || []).some(
@@ -1456,16 +1457,18 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <span className="whitespace-nowrap">Planejamento de Sprint</span>
             </button>
 
-            <button
-              onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
-                ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`}
-            >
-              <TrendingUp size={18} />
-              <span className="whitespace-nowrap">Métricas</span>
-            </button>
+            {isManager && (
+              <button
+                onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
+                  ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`}
+              >
+                <TrendingUp size={18} />
+                <span className="whitespace-nowrap">Métricas</span>
+              </button>
+            )}
 
             <button
               onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
@@ -2542,18 +2545,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               </div>
             );
           })()
-        ) : activeTab === 'metrics' ? (
+        ) : activeTab === 'metrics' && isManager ? (
           /* ================= TELA MÉTRICAS ================= */
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center max-w-lg mx-auto mt-10">
-            <TrendingUp className="mx-auto text-brand-600 mb-4 animate-pulse" size={40} />
-            <h2 className="text-xl font-extrabold text-slate-800">Métricas de Equipe e Performance</h2>
-            <p className="text-slate-500 mt-2 text-sm leading-relaxed">
-              Visualize gráficos automatizados de Velocity, veja o burndown da sprint atual e acompanhe a governança da sprint através dos logs automáticos de RDA.
-            </p>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-6 rounded-full text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200">
-              <Sparkles size={12} />
-              Em breve nesta branch!
-            </div>
+          <div className="flex-1 overflow-y-auto no-scrollbar pb-10 mt-6">
+             <RelatoriosPage projectId={project.id_projeto} sprints={sprints} />
           </div>
         ) : (
           /* ================= TELA CONFIGURAÇÕES ================= */
@@ -2651,8 +2646,6 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                   onChange={(e) => handleUpdateMemberProfile(m.id_usuario, e.target.value)}
                                   className="text-xs font-bold px-2 py-1 rounded-lg bg-white border border-slate-300 text-slate-700 outline-none hover:border-brand-300 focus:border-brand-500 transition-all cursor-pointer"
                                 >
-                                  <option value="ADMIN">ADMIN</option>
-                                  <option value="GERENTE">GERENTE</option>
                                   <option value="PO">PO</option>
                                   <option value="DEV">DEV</option>
                                   <option value="TESTER">TESTER</option>

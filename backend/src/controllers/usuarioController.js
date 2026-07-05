@@ -219,10 +219,20 @@ export const buscarUsuarios = async (req, res) => {
 
     const usuarios = await prisma.usuario.findMany({
       where: {
-        email: {
-          contains: q.trim(),
-          mode: 'insensitive',
-        },
+        OR: [
+          {
+            email: {
+              contains: q.trim(),
+              mode: 'insensitive',
+            },
+          },
+          {
+            nome: {
+              contains: q.trim(),
+              mode: 'insensitive',
+            },
+          },
+        ]
       },
       select: {
         id_usuario: true,

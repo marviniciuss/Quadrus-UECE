@@ -16,6 +16,7 @@ import membroProjetoRoutes from "./routes/membroProjetoRoutes.js";
 import anexoCardRoutes from "./routes/anexoCardRoutes.js";
 import votoPokerRoutes from "./routes/votoPokerRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
+import relatorioRoutes from "./routes/relatorioRoutes.js";
 import { inicializarTimeoutsPoker } from "./utils/pokerScheduler.js";
 
 dotenv.config();
@@ -60,6 +61,7 @@ app.use("/api", membroProjetoRoutes);
 app.use("/api", anexoCardRoutes);
 app.use("/api", votoPokerRoutes);
 app.use("/api", logRoutes);
+app.use("/api/projetos/:projectId/relatorios", relatorioRoutes);
 
 // Socket.io setup
 const io = new Server(httpServer, {
