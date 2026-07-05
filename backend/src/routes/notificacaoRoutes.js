@@ -6,6 +6,7 @@ import {
   marcarTodasComoLidas,
   aceitarConvite,
   recusarConvite,
+  aceitarHomologacao,
 } from "../controllers/notificacaoController.js";
 
 const router = express.Router();
@@ -22,5 +23,6 @@ router.post("/notificacoes/ler-todas", verifyFirebaseToken, marcarTodasComoLidas
 // Aceitar/Recusar convites de projetos
 router.post("/notificacoes/:id/aceitar", verifyFirebaseToken, aceitarConvite);
 router.post("/notificacoes/:id/recusar", verifyFirebaseToken, recusarConvite);
+router.post("/notificacoes/:id/aceitar-homologacao", verifyFirebaseToken, aceitarHomologacao);
 
 export default router;

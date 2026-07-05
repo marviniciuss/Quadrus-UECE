@@ -341,9 +341,22 @@ export const atualizarCard = async (req, res) => {
     const isPO = membro.perfil === "PO";
     const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
 
-    if (!isGerente && !isPO && !isCriador) {
+    // Qualquer membro do projeto pode atualizar a descrição (que inclui os comentários e checklists).
+    // Restringimos a edição de outros campos estruturais apenas para Gerente, PO ou Criador do card.
+    const alterandoOutrosCampos =
+      titulo !== undefined ||
+      prioridade !== undefined ||
+      tags !== undefined ||
+      id_responsavel !== undefined ||
+      id_sprint !== undefined ||
+      story_points !== undefined ||
+      em_risco !== undefined ||
+      id_coluna !== undefined ||
+      id_etiquetas !== undefined;
+
+    if (alterandoOutrosCampos && !isGerente && !isPO && !isCriador) {
       return res.status(403).json({
-        error: "Acesso negado: apenas o criador do card, Gerente ou PO podem editar este card",
+        error: "Acesso negado: apenas o criador do card, Gerente ou PO podem editar campos estruturais deste card",
       });
     }
 
@@ -660,6 +673,11 @@ export const atualizarStatusCard = async (req, res) => {
       proximaOrdem = ultimoCard ? ultimoCard.ordem + 1 : 1;
     }
 
+    const isMovingToHomologation = legacyStatus === "HOMOLOGACAO";
+    const proximoIdDevOriginal = isMovingToHomologation 
+      ? (card.id_responsavel || (deveAtribuir ? membro.id_usuario : null))
+      : undefined;
+
     const cardAtualizado = await prisma.card.update({
       where: { id_card: id },
       data: {
@@ -667,6 +685,7 @@ export const atualizarStatusCard = async (req, res) => {
         status: legacyStatus,
         ordem: proximaOrdem,
         ...(deveAtribuir && { id_responsavel: membro.id_usuario }),
+        ...(isMovingToHomologation && { id_dev_original: proximoIdDevOriginal })
       },
       include: {
         responsavel: true,
@@ -711,6 +730,7 @@ export const atualizarStatusCard = async (req, res) => {
             data: {
               id_usuario_destino: tester.id_usuario,
               id_card_origem: card.id_card,
+              solicitacao_homologacao: true,
               mensagem,
             },
             include: {
@@ -725,9 +745,9 @@ export const atualizarStatusCard = async (req, res) => {
             },
           });
 
-          // Emitir notificação em tempo real via Socket.io
+          // Emitir notificação em tempo real via Socket.io para o canal do tester
           if (io) {
-            io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+            io.to(`user:${tester.id_usuario}`).emit('nova_notificacao', notificacao);
           }
         }
       } catch (notifError) {
@@ -983,7 +1003,7 @@ export const reprovarCard = async (req, res) => {
     if (!["TESTER","GERENTE","ADMIN"].includes(membro.perfil)) {
 
       return res.status(403).json({
-        error: "Somente Tester pode reprovar."
+        error: "Somente Tester, Gerente ou Admin podem reprovar."
       });
 
     }
@@ -1022,6 +1042,12 @@ export const reprovarCard = async (req, res) => {
 
     });
 
+    if (!coluna) {
+      return res.status(400).json({
+        error: "Coluna EM ANDAMENTO não encontrada."
+      });
+    }
+
     const ultimo = await prisma.card.findFirst({
 
       where: {
@@ -1054,7 +1080,11 @@ export const reprovarCard = async (req, res) => {
 
         id_coluna: coluna.id_coluna,
 
-        ordem: ultimo ? ultimo.ordem + 1 : 1
+        ordem: ultimo ? ultimo.ordem + 1 : 1,
+
+        id_responsavel: card.id_dev_original || card.id_responsavel,
+
+        id_dev_original: null
 
       },
 

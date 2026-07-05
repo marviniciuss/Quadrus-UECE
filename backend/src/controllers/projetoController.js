@@ -359,7 +359,7 @@ export const adicionarMembro = async (req, res) => {
     // Emitir notificação em tempo real via Socket.io
     const io = req.app.get('io');
     if (io) {
-      io.to(id).emit('nova_notificacao', notificacao);
+      io.to(`user:${usuario.id_usuario}`).emit('nova_notificacao', notificacao);
     }
 
     return res.status(201).json({

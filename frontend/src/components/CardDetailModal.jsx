@@ -55,7 +55,7 @@ const getColors = (hex) => {
 export default function CardDetailModal({ cardId, project, currentUserEmail, onClose, onUpdateProject, showToast }) {
   const [selectedCard, setSelectedCard] = useState(null);
   const [loadingCard, setLoadingCard] = useState(true);
-  
+
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [newDescriptionText, setNewDescriptionText] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
@@ -67,6 +67,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const [timeLeft, setTimeLeft] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionComment, setRejectionComment] = useState('');
 
   // --- Helpers de Parse e Serialização (Markdown + Metadata) ---
   const parseCardDesc = (desc) => {
@@ -103,7 +105,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     let checklistText = '';
     const separatorRegex = /(###?\s*CENÁRIOS DE TESTE|CENÁRIOS DE TESTE)/i;
     const separatorMatch = rawText.match(separatorRegex);
-    
+
     if (separatorMatch) {
       const idx = separatorMatch.index;
       descriptionText = rawText.substring(0, idx).trim();
@@ -156,7 +158,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
       setSelectedCard(res.data);
       setNewDescriptionText(parseCardDesc(res.data.descricao).descriptionText);
       setTempTitle(res.data.titulo);
-      
+
       const updatedProject = {
         ...project,
         cards: (project.cards || []).map(c => c.id_card === id ? res.data : c)
@@ -269,7 +271,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     try {
       const parsed = parseCardDesc(selectedCard.descricao);
       let lines = parsed.checklistText.split('\n');
-      
+
       let matchedCount = -1;
       for (let i = 0; i < lines.length; i++) {
         const match = lines[i].match(/^(\s*[-*])\s+\[([ xX])\]\s+(.+)$/);
@@ -282,7 +284,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
           }
         }
       }
-      
+
       const updatedChecklistText = lines.join('\n');
       const updatedDesc = serializeCardDesc(parsed.descriptionText, updatedChecklistText, parsed.poker, parsed.comments);
       const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
@@ -305,7 +307,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
       } else {
         checklistText = checklistText.trim() + `\n- [ ] ${newScenarioText.trim()}`;
       }
-      
+
       const updatedDesc = serializeCardDesc(parsed.descriptionText, checklistText, parsed.poker, parsed.comments);
       const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
       setSelectedCard(res.data);
@@ -360,7 +362,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
       const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, updatedPoker, parsed.comments);
       const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
-      
+
       setSelectedCard(res.data);
       setPokerSelectedCard(null);
       await reloadCardDetail(selectedCard.id_card);
@@ -410,7 +412,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
       const updatedPoker = { active: false, expiresAt: null };
       const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, updatedPoker, parsed.comments);
       const pts = points === '?' ? null : parseInt(points);
-      
+
       await api.patch(`/api/cards/${selectedCard.id_card}`, {
         story_points: pts,
         descricao: updatedDesc
@@ -428,17 +430,72 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     try {
       const parsed = parseCardDesc(selectedCard.descricao);
       const updatedPoker = { active: false, expiresAt: null };
-      
+
       await api.delete(`/api/cards/${selectedCard.id_card}/votos`);
-      
+
       const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, updatedPoker, parsed.comments);
       await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
-      
+
       await reloadCardDetail(selectedCard.id_card);
       showToast("Sessão de votação reiniciada.", "info");
     } catch (err) {
       console.error("Erro ao reiniciar poker:", err);
       showToast("Erro ao reiniciar votação.", "error");
+    }
+  };
+
+  const handleAprovarCard = async () => {
+    if (!selectedCard) return;
+    try {
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}/aprovar`);
+      setSelectedCard(res.data);
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Card aprovado e movido para Concluído com sucesso!", "success");
+    } catch (err) {
+      console.error("Erro ao aprovar card:", err);
+      showToast(err.response?.data?.error || "Erro ao aprovar card.", "error");
+    }
+  };
+
+  const handleReprovarCard = async () => {
+    if (!selectedCard) return;
+    if (!rejectionComment.trim()) {
+      showToast("Por favor, informe os passos para reprodução.", "warning");
+      return;
+    }
+    try {
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}/reprovar`, {
+        comentario: rejectionComment.trim()
+      });
+      setSelectedCard(res.data);
+      setRejectionComment('');
+      setIsRejecting(false);
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Card reprovado e movido para Em Andamento.", "success");
+    } catch (err) {
+      console.error("Erro ao reprovar card:", err);
+      showToast(err.response?.data?.error || "Erro ao reprovar card.", "error");
+    }
+  };
+
+  const handleEnviarParaTestes = async () => {
+    if (!selectedCard || !project.colunas) return;
+    const colHomologacao = project.colunas.find(c => c.nome === "HOMOLOGAÇÃO");
+    if (!colHomologacao) {
+      showToast("Coluna de Homologação não encontrada.", "error");
+      return;
+    }
+    try {
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}/status`, {
+        status: "HOMOLOGACAO",
+        id_coluna: colHomologacao.id_coluna
+      });
+      setSelectedCard(res.data);
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Card enviado para homologação!", "success");
+    } catch (err) {
+      console.error("Erro ao enviar card para testes:", err);
+      showToast(err.response?.data?.error || "Erro ao enviar card para testes.", "error");
     }
   };
 
@@ -553,13 +610,28 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const isDev = meuMembro?.perfil === 'DEV';
   const isPO = meuMembro?.perfil === 'PO';
   const isGerente = meuMembro?.perfil === 'GERENTE' || meuMembro?.perfil === 'ADMIN';
+  const isTester = meuMembro?.perfil === 'TESTER';
+  const isAuthorizedToHomologate = isTester || isGerente;
+
+  const dbComments = (selectedCard.comentarios || []).map(c => ({
+    id_comentario: c.id_comentario,
+    autor: c.usuario?.nome || 'Usuário',
+    foto: c.usuario?.foto || null,
+    texto: c.conteudo,
+    createdAt: c.createdAt
+  }));
+
+  const allComments = [...parsed.comments, ...dbComments].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+
   const canManagePoker = isPO || isGerente;
   const canEditOrDelete = isGerente || isPO || !selectedCard.id_criador || selectedCard.id_criador === meuMembro?.id_usuario;
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in text-slate-700">
       <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl shadow-2xl relative overflow-hidden text-left flex flex-col max-h-[90vh] animate-scale-up">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
@@ -594,10 +666,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col md:flex-row gap-8">
-          
+
           {/* Coluna Esquerda: Descrição, Cenários, Discussão */}
           <div className="flex-1 space-y-8 min-w-0 pb-8">
-            
+
             {/* Título (Editável inline) */}
             <div className="space-y-1.5">
               {editingTitle ? (
@@ -693,10 +765,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
                 Discussão
               </h3>
-              
+
               {/* Lista de Comentários */}
               <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                {parsed.comments.map((comment) => (
+                {allComments.map((comment) => (
                   <div key={comment.id_comentario} className="flex gap-3 text-left">
                     <AvatarWithFallback
                       nome={comment.autor}
@@ -714,7 +786,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                     </div>
                   </div>
                 ))}
-                {parsed.comments.length === 0 && (
+                {allComments.length === 0 && (
                   <p className="text-xs text-slate-450 italic text-center py-4">Nenhum comentário postado ainda. Seja o primeiro!</p>
                 )}
               </div>
@@ -746,10 +818,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
 
           {/* Coluna Direita: Atributos, Planning Poker, Anexos */}
           <div className="w-full md:w-[320px] shrink-0 space-y-6 pb-8">
-            
+
             {/* Planning Poker */}
             <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4">
-              
+
               {/* HEADER PLANNING POKER */}
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase bg-brand-100 text-brand-850 px-2 py-0.5 rounded">
@@ -820,7 +892,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                       // Determina se este card está selecionado pelo usuário ativo
                       const isSelected = pokerSelectedCard === val;
                       const userVotedThis = isPokerActive && meuVoto && meuVoto.valor === dbVal;
-                      
+
                       // Highlight final selection for PO/Gerente during expiration
                       const isDecidedSelection = isPokerExpired && isSelected;
 
@@ -945,7 +1017,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                       </div>
                     ) : (
                       <p className="text-xs text-slate-400 italic text-center pt-2">
-                        Aguardando o PO ou Gerente salvar a pontuação final.
+                        Aguardando o PO salvar a pontuação final.
                       </p>
                     )
                   )}
@@ -965,6 +1037,84 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               )}
 
             </div>
+
+            {/* Botão Enviar para Testes (Dev → QA) */}
+            {selectedCard.status !== "HOMOLOGACAO" && selectedCard.status !== "CONCLUIDO" && (
+              <button
+                type="button"
+                onClick={handleEnviarParaTestes}
+                className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-750 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-purple-600/10 transition-all active:scale-[0.98]"
+              >
+                <Send size={14} />
+                Enviar para testes
+              </button>
+            )}
+
+            {/* Seção Homologação */}
+            {selectedCard.status === "HOMOLOGACAO" && (
+              <div className="space-y-4 text-left p-3.5 bg-purple-50/50 border border-purple-100 rounded-2xl">
+                <h4 className="text-[10px] font-extrabold text-purple-750 uppercase tracking-wider">Ações de Homologação</h4>
+
+                {isAuthorizedToHomologate ? (
+                  isRejecting ? (
+                    <div className="space-y-3">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Passos para Reprodução (Motivo da Reprovação)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={rejectionComment}
+                        onChange={(e) => setRejectionComment(e.target.value)}
+                        placeholder="Informe os passos para reprodução..."
+                        className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-purple-650 text-slate-700 font-medium"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRejecting(false);
+                            setRejectionComment('');
+                          }}
+                          className="px-3 py-1.5 border border-slate-250 hover:bg-slate-50 text-slate-550 rounded-lg text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleReprovarCard}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-750 text-white rounded-lg text-xs font-bold"
+                        >
+                          Confirmar Reprovação
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAprovarCard}
+                        className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-750 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/10 transition-all"
+                      >
+                        <Check size={14} />
+                        Aprovar Card
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsRejecting(true)}
+                        className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-750 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/10 transition-all"
+                      >
+                        <X size={14} />
+                        Reprovar Card
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-xs text-slate-500 italic">
+                    Aguardando homologação de um Tester.
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Responsável */}
             <div className="space-y-1">
@@ -1009,11 +1159,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                     <button
                       key={et.id_etiqueta}
                       onClick={() => canEditOrDelete && handleToggleCardEtiqueta(et.id_etiqueta)}
-                      className={`px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${
-                        isSelected
+                      className={`px-2.5 py-1.5 rounded-lg border font-bold text-[9px] transition-all ${isSelected
                           ? 'bg-[#320066] border-[#320066] text-white shadow-sm'
                           : 'bg-[#EAECEF] border-transparent text-[#475569] hover:bg-[#DEE2E6]'
-                      } ${!canEditOrDelete ? 'opacity-75 cursor-not-allowed' : ''}`}
+                        } ${!canEditOrDelete ? 'opacity-75 cursor-not-allowed' : ''}`}
                     >
                       {et.nome}
                     </button>
@@ -1025,7 +1174,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             {/* Anexos (Apenas Links) */}
             <div className="space-y-3 bg-slate-50/50 border border-slate-100 rounded-2xl p-4.5 p-4 text-left">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Anexos</h4>
-              
+
               {/* Lista de Anexos */}
               <div className="space-y-2">
                 {selectedCard.anexos?.map((anexo) => (
@@ -1114,11 +1263,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             <button
               onClick={() => handleUpdateCardField('em_risco', !selectedCard.em_risco)}
               disabled={!canEditOrDelete}
-              className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${
-                selectedCard.em_risco 
-                  ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50' 
+              className={`w-full py-3 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 ${selectedCard.em_risco
+                  ? 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100/50'
                   : 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/10'
-              } disabled:opacity-75 disabled:cursor-not-allowed`}
+                } disabled:opacity-75 disabled:cursor-not-allowed`}
             >
               <AlertTriangle size={14} />
               {selectedCard.em_risco ? 'Remover Sinal de Atraso' : 'Sinalizar Atraso'}

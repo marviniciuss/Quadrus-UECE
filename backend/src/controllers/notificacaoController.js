@@ -214,3 +214,84 @@ export const recusarConvite = async (req, res) => {
     return res.status(500).json({ error: "Erro ao recusar convite" });
   }
 };
+
+/**
+ * Aceitar homologação de card
+ */
+export const aceitarHomologacao = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { email: req.user.email },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    const notificacao = await prisma.notificacao.findUnique({
+      where: { id_notificacao: id },
+      include: { card: true }
+    });
+
+    if (!notificacao) {
+      return res.status(404).json({ error: "Notificação não encontrada" });
+    }
+
+    if (notificacao.id_usuario_destino !== usuario.id_usuario) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    if (!notificacao.solicitacao_homologacao || !notificacao.id_card_origem) {
+      return res.status(400).json({ error: "Esta notificação não é uma solicitação de homologação válida" });
+    }
+
+    const card = notificacao.card;
+    if (!card) {
+      return res.status(404).json({ error: "Card correspondente não encontrado" });
+    }
+
+    // Update the card assignee to the tester
+    const cardAtualizado = await prisma.card.update({
+      where: { id_card: card.id_card },
+      data: {
+        id_responsavel: usuario.id_usuario
+      },
+      include: {
+        responsavel: true,
+        sprint: true,
+        etiquetas: true
+      }
+    });
+
+    // Delete all homologation request notifications for this card
+    await prisma.notificacao.deleteMany({
+      where: {
+        id_card_origem: card.id_card,
+        solicitacao_homologacao: true
+      }
+    });
+
+    // Register action log
+    const { registrarLog } = await import("../utils/registrarLog.js");
+    await registrarLog({
+      id_usuario: usuario.id_usuario,
+      acao: `Aceitou homologar o card "${card.titulo}"`,
+      tipo_acao: "OUTRO",
+      id_card: card.id_card,
+      id_sprint: card.id_sprint,
+    });
+
+    // Emit socket event to reload the board
+    const io = req.app.get('io');
+    if (io) {
+      io.to(card.id_projeto).emit('card_moved', cardAtualizado);
+    }
+
+    return res.json({ message: "Homologação aceita com sucesso!", card: cardAtualizado });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Erro ao aceitar homologação" });
+  }
+};

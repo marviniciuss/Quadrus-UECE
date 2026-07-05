@@ -196,6 +196,7 @@ export default function InviteMemberModal({ isOpen, onClose, project, onUpdatePr
             >
               <option value="DEV">DEV (Desenvolvedor)</option>
               <option value="PO">PO (Product Owner)</option>
+              <option value="TESTER">TESTER</option>
               <option value="GERENTE">GERENTE</option>
             </select>
           </div>

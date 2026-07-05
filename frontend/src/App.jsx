@@ -188,6 +188,21 @@ export default function App() {
     }
   };
 
+  const handleAcceptHomologacao = async (id) => {
+    try {
+      const res = await api.post(`/api/notificacoes/${id}/aceitar-homologacao`);
+      alert('Homologação aceita com sucesso!');
+      await fetchNotifications();
+      if (selectedProject) {
+        const resProj = await api.get(`/api/projetos/${selectedProject.id_projeto}`);
+        handleUpdateProject(resProj.data);
+      }
+    } catch (error) {
+      console.error('Erro ao aceitar homologação:', error);
+      alert(error.response?.data?.error || 'Erro ao aceitar homologação.');
+    }
+  };
+
   const formatTimeAgo = (dateStr) => {
     const d = new Date(dateStr);
     const now = new Date();
@@ -276,11 +291,18 @@ export default function App() {
     socket.on('connect', () => setSocketStatus('online'));
     socket.on('connect_error', () => setSocketStatus('offline'));
 
-    return () => {
-      socket.off('connect');
-      socket.off('connect_error');
-    };
   }, []);
+
+  useEffect(() => {
+    if (dbUser && socketStatus === 'online') {
+      socket.emit('join_user', dbUser.id_usuario);
+      console.log(`Subscribed to user room: user:${dbUser.id_usuario}`);
+      return () => {
+        socket.emit('leave_user', dbUser.id_usuario);
+        console.log(`Unsubscribed from user room: user:${dbUser.id_usuario}`);
+      };
+    }
+  }, [dbUser, socketStatus]);
 
   const handleLogout = async () => {
     try {
@@ -456,9 +478,9 @@ export default function App() {
                     notifications.map((n) => (
                       <div
                         key={n.id_notificacao}
-                        onClick={() => !n.lida && !n.id_projeto_origem && handleMarkAsRead(n.id_notificacao)}
+                        onClick={() => !n.lida && !n.id_projeto_origem && !n.solicitacao_homologacao && handleMarkAsRead(n.id_notificacao)}
                         className={`text-xs px-3 py-2.5 rounded-lg transition-colors ${
-                          n.id_projeto_origem ? '' : 'cursor-pointer'
+                          (n.id_projeto_origem || n.solicitacao_homologacao) ? '' : 'cursor-pointer'
                         } ${
                           n.lida
                             ? 'text-slate-400 hover:bg-slate-50'
@@ -479,6 +501,16 @@ export default function App() {
                               className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-bold transition-colors"
                             >
                               Recusar
+                            </button>
+                          </div>
+                        )}
+                        {n.solicitacao_homologacao && !n.lida && (
+                          <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleAcceptHomologacao(n.id_notificacao)}
+                              className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-750 text-white rounded-lg text-[10px] font-bold transition-colors"
+                            >
+                              Aceitar tarefa
                             </button>
                           </div>
                         )}
@@ -563,6 +595,7 @@ export default function App() {
           setDbUser(updatedUser);
           dbUserRef.current = updatedUser;
         }}
+        onLogout={handleLogout}
       />
     </div>
   );

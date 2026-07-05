@@ -124,6 +124,7 @@ model Card {
   id_projeto     String           @db.Uuid
   id_sprint      String?          @db.Uuid
   id_responsavel String?          @db.Uuid
+  id_dev_original String?         @db.Uuid
   id_coluna      String?          @db.Uuid
   id_criador     String?          @db.Uuid
   titulo         String
@@ -192,6 +193,7 @@ model Notificacao {
   id_card_origem     String?     @db.Uuid
   id_projeto_origem  String?     @db.Uuid
   convite_perfil     Perfil?
+  solicitacao_homologacao Boolean @default(false)
   mensagem           String
   lida               Boolean     @default(false)
   

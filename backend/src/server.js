@@ -97,6 +97,17 @@ io.on('connection', (socket) => {
     console.log(`Socket ${socket.id} left poker session: ${taskId}`);
   });
 
+  // User room subscription
+  socket.on('join_user', (userId) => {
+    socket.join(`user:${userId}`);
+    console.log(`Socket ${socket.id} joined user room: user:${userId}`);
+  });
+
+  socket.on('leave_user', (userId) => {
+    socket.leave(`user:${userId}`);
+    console.log(`Socket ${socket.id} left user room: user:${userId}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
   });

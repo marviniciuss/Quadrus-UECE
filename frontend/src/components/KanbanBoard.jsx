@@ -387,6 +387,27 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
     fetchSprints();
   }, [project.id_projeto, fetchSprints]);
 
+  useEffect(() => {
+    if (!project.cards || sprints.length === 0) return;
+
+    setSprints(prevSprints => {
+      let changed = false;
+      const nextSprints = prevSprints.map(s => {
+        if (!s.cards) return s;
+        const nextCards = s.cards.map(sc => {
+          const found = project.cards.find(pc => pc.id_card === sc.id_card);
+          if (found && (found.status !== sc.status || found.id_coluna !== sc.id_coluna || found.story_points !== sc.story_points || found.titulo !== sc.titulo || found.descricao !== sc.descricao)) {
+            changed = true;
+            return found;
+          }
+          return sc;
+        });
+        return { ...s, cards: nextCards };
+      });
+      return changed ? nextSprints : prevSprints;
+    });
+  }, [project.cards, sprints.length]);
+
   const refreshProject = async () => {
     try {
       const res = await api.get(`/api/projetos/${project.id_projeto}`);
@@ -1465,15 +1486,6 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Workspace Ativo</span>
           </div>
-
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold border-l-4 border-transparent text-rose-500 hover:text-rose-700 hover:bg-rose-50/50 transition-all active:scale-95"
-            title="Sair da Sessão"
-          >
-            <LogOut size={18} />
-            <span>Sair da Sessão</span>
-          </button>
         </div>
       </aside>
 

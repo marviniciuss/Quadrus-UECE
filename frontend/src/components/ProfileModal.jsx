@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Check, Loader2, RefreshCw } from 'lucide-react';
+import { X, Save, Check, Loader2, RefreshCw, LogOut } from 'lucide-react';
 import api from '../utils/api.js';
 
-export default function ProfileModal({ isOpen, onClose, user, onSave }) {
+export default function ProfileModal({ isOpen, onClose, user, onSave, onLogout }) {
   const [nome, setNome] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(null); // null means default (using name)
   const [loading, setLoading] = useState(false);
@@ -164,14 +164,19 @@ export default function ProfileModal({ isOpen, onClose, user, onSave }) {
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all disabled:opacity-50"
-            >
-              Cancelar
-            </button>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onLogout();
+                }}
+                className="mr-auto flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all"
+              >
+                <LogOut size={14} />
+                <span>Sair da Conta</span>
+              </button>
+            )}
             <button
               type="submit"
               disabled={loading}
