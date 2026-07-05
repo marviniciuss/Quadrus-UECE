@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Edit,
   Check,
+  CheckCircle2,
   Award
 } from 'lucide-react';
 
@@ -599,6 +600,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const meuMembro = project.membros?.find(m => m.usuario?.email === currentUserEmail);
   const isDev = meuMembro?.perfil === 'DEV';
   const isPO = meuMembro?.perfil === 'PO';
+  const isTester = meuMembro?.perfil === 'TESTER';
   const isGerente = meuMembro?.perfil === 'GERENTE' || meuMembro?.perfil === 'ADMIN';
   const canManagePoker = isPO || isGerente;
   const canEditOrDelete = isGerente || isPO || !selectedCard.id_criador || selectedCard.id_criador === meuMembro?.id_usuario;
@@ -1157,6 +1159,30 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                 )
               )}
             </div>
+
+            {/* Botão de Aprovação por Tester */}
+            {selectedCard.status === 'HOMOLOGACAO' && (isTester || isGerente || isPO) && (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.patch(`/api/cards/${selectedCard.id_card}/status`, {
+                      status: 'CONCLUIDO'
+                    });
+                    setSelectedCard(res.data);
+                    await reloadCardDetail(selectedCard.id_card);
+                    showToast("Entrega aprovada com sucesso!", "success");
+                    onClose(); // Opcional: fechar modal após aprovar
+                  } catch (err) {
+                    console.error("Erro ao aprovar card:", err);
+                    showToast("Erro ao aprovar entrega.", "error");
+                  }
+                }}
+                className="w-full py-3 mb-2 rounded-xl font-extrabold text-xs transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+              >
+                <CheckCircle2 size={16} />
+                Aprovar Entrega
+              </button>
+            )}
 
             {/* Sinalizar Atraso */}
             <div className="space-y-2">

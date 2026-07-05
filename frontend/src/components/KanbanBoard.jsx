@@ -2875,8 +2875,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             </h3>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               {project.arquivado
-                ? <>Tem certeza que deseja desarquivar <strong>{project.nome}</strong>? Ele voltará a aparecer na sua lista de projetos ativos.</>
-                : <>Tem certeza que deseja arquivar <strong>{project.nome}</strong>? Ele deixará de aparecer no dashboard principal, mas seus dados continuarão salvos.</>
+                ? <>Tem certeza que deseja desarquivar <strong>{project.nome}</strong>? Ele voltará a aparecer na sua lista de quadros ativos.</>
+                : <>Tem certeza que deseja arquivar o quadro <strong>{project.nome}</strong>? Ele deixará de aparecer na lista principal.</>
               }
             </p>
             <div className="flex gap-3 justify-center">

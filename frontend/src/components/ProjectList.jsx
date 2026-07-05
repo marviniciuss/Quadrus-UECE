@@ -95,7 +95,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                         onClick={() => setShowArchived(false)}
                         className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${!showArchived ? 'bg-brand-50 text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Projetos Ativos
+                        Quadros Ativos
                     </button>
                     <button
                         onClick={() => setShowArchived(true)}
@@ -191,7 +191,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                         {projects.length === 0 ? 'Você ainda não participa de nenhum projeto' : 'Nenhum projeto encontrado'}
                     </h3>
                     {projects.length === 0 && (
-                        <p className="text-sm text-slate-500 mt-2">Crie um novo projeto para começar a gerenciar suas tarefas.</p>
+                        <p className="text-sm text-slate-500 mt-2">Crie um novo quadro para começar a gerenciar suas tarefas.</p>
                     )}
                 </div>
             )}
@@ -203,7 +203,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                     className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/20 active:scale-95 shadow-md shadow-brand-500/10"
                 >
                     <Plus size={18} />
-                    Novo Projeto
+                    Novo Quadro
                 </button>
             </div>
 
@@ -219,7 +219,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                             <div>
                                 <h2 className="text-xl font-extrabold text-brand-600 flex items-center gap-2">
                                     <Briefcase size={20} />
-                                    Criar Novo Projeto
+                                    Criar Novo Quadro
                                 </h2>
                                 <p className="text-xs text-slate-400 mt-1">Insira os detalhes e prazos para o novo espaço ágil.</p>
                             </div>

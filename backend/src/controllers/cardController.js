@@ -629,6 +629,16 @@ export const atualizarStatusCard = async (req, res) => {
       });
     }
 
+    // Validação de Permissão para CONCLUÍDO (US06.01)
+    if (targetColuna.nome === "CONCLUÍDO") {
+      const allowedRoles = ["TESTER", "GERENTE", "PO", "ADMIN"];
+      if (!allowedRoles.includes(membro.perfil)) {
+        return res.status(403).json({
+          error: "Acesso Negado: Apenas Testers ou Gestores podem aprovar e finalizar uma atividade (mover para Concluído)."
+        });
+      }
+    }
+
     // Mapear de volta para o status legado
     let legacyStatus = "A_FAZER";
     if (targetColuna.nome === "EM ANDAMENTO") legacyStatus = "EM_ANDAMENTO";
@@ -668,9 +678,17 @@ export const atualizarStatusCard = async (req, res) => {
     });
 
     if (card.id_coluna !== targetColuna.id_coluna) {
+      let acaoTexto = `Moveu o card "${card.titulo}" para a coluna "${targetColuna.nome}"`;
+      
+      if (targetColuna.nome === "CONCLUÍDO") {
+        if (membro.perfil === "TESTER" || membro.perfil === "GERENTE" || membro.perfil === "PO" || membro.perfil === "ADMIN") {
+          acaoTexto = `Aprovou e finalizou a entrega do card "${card.titulo}"`;
+        }
+      }
+
       await registrarLog({
         id_usuario: membro.id_usuario,
-        acao: `Moveu o card "${card.titulo}" para a coluna "${targetColuna.nome}"`,
+        acao: acaoTexto,
         tipo_acao: "MOVIMENTACAO",
         id_card: card.id_card,
         id_sprint: card.id_sprint,
