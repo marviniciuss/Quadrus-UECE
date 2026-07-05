@@ -265,6 +265,14 @@ export const buscarCard = async (req, res) => {
           },
         },
         etiquetas: true,
+        comentarios: {
+            include: {
+                usuario: true
+            },
+            orderBy: {
+                createdAt: "asc"
+            }
+        },
       },
     });
 
@@ -826,4 +834,278 @@ export const reordenarCards = async (req, res) => {
       error: "Erro ao reordenar cards",
     });
   }
+};
+
+export const aprovarCard = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const card = await prisma.card.findUnique({
+      where: { id_card: id },
+      include: {
+        responsavel: true
+      }
+    });
+
+    if (!card) {
+      return res.status(404).json({
+        error: "Card não encontrado"
+      });
+    }
+
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+
+    if (!membro) {
+      return res.status(403).json({
+        error: "Acesso negado"
+      });
+    }
+
+    if (!["TESTER", "GERENTE", "ADMIN"].includes(membro.perfil)) {
+      return res.status(403).json({
+        error: "Somente Tester, Gerente ou Admin podem aprovar."
+      });
+    }
+
+    if (card.status !== "HOMOLOGACAO") {
+      return res.status(400).json({
+        error: "O card não está em homologação."
+      });
+    }
+
+    const colunaConcluido = await prisma.coluna.findFirst({
+      where: {
+        id_projeto: card.id_projeto,
+        nome: "CONCLUÍDO"
+      }
+    });
+
+    if (!colunaConcluido) {
+      return res.status(400).json({
+        error: "Coluna CONCLUÍDO não encontrada."
+      });
+    }
+
+    const ultimo = await prisma.card.findFirst({
+      where: {
+        id_coluna: colunaConcluido.id_coluna,
+        deletado_em: null
+      },
+      orderBy: {
+        ordem: "desc"
+      }
+    });
+
+    const atualizado = await prisma.card.update({
+      where: {
+        id_card: id
+      },
+      data: {
+        status: "CONCLUIDO",
+        id_coluna: colunaConcluido.id_coluna,
+        ordem: ultimo ? ultimo.ordem + 1 : 1
+      },
+      include: {
+        responsavel: true,
+        sprint: true,
+        etiquetas: true
+      }
+    });
+
+    await registrarLog({
+      id_usuario: membro.id_usuario,
+      id_card: card.id_card,
+      id_sprint: card.id_sprint,
+      tipo_acao: "MOVIMENTACAO",
+      acao: `Aprovou o card "${card.titulo}"`,
+    });
+
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(card.id_projeto).emit("card_moved", atualizado);
+    }
+
+    return res.json(atualizado);
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      error: "Erro ao aprovar card"
+    });
+
+  }
+
+};
+
+export const reprovarCard = async (req, res) => {
+
+  const { id } = req.params;
+
+  const { comentario } = req.body;
+
+  try {
+
+    if (!comentario?.trim()) {
+
+      return res.status(400).json({
+        error: "Informe os passos para reprodução."
+      });
+
+    }
+
+    const card = await prisma.card.findUnique({
+      where: {
+        id_card: id
+      }
+    });
+
+    if (!card) {
+
+      return res.status(404).json({
+        error: "Card não encontrado"
+      });
+
+    }
+
+    const membro = await obterMembroProjeto(card.id_projeto, req.user.email);
+
+    if (!membro) {
+
+      return res.status(403).json({
+        error: "Acesso negado"
+      });
+
+    }
+
+    if (!["TESTER","GERENTE","ADMIN"].includes(membro.perfil)) {
+
+      return res.status(403).json({
+        error: "Somente Tester pode reprovar."
+      });
+
+    }
+
+    if (card.status !== "HOMOLOGACAO") {
+
+      return res.status(400).json({
+        error: "O card não está em homologação."
+      });
+
+    }
+
+    await prisma.comentarioCard.create({
+
+      data: {
+
+        id_card: card.id_card,
+
+        id_usuario: membro.id_usuario,
+
+        conteudo: comentario
+
+      }
+
+    });
+
+    const coluna = await prisma.coluna.findFirst({
+
+      where: {
+
+        id_projeto: card.id_projeto,
+
+        nome: "EM ANDAMENTO"
+
+      }
+
+    });
+
+    const ultimo = await prisma.card.findFirst({
+
+      where: {
+
+        id_coluna: coluna.id_coluna,
+
+        deletado_em: null
+
+      },
+
+      orderBy: {
+
+        ordem: "desc"
+
+      }
+
+    });
+
+    const atualizado = await prisma.card.update({
+
+      where: {
+
+        id_card: id
+
+      },
+
+      data: {
+
+        status: "EM_ANDAMENTO",
+
+        id_coluna: coluna.id_coluna,
+
+        ordem: ultimo ? ultimo.ordem + 1 : 1
+
+      },
+
+      include: {
+
+        responsavel: true,
+
+        sprint: true,
+
+        etiquetas: true
+
+      }
+
+    });
+
+    await registrarLog({
+
+      id_usuario: membro.id_usuario,
+
+      id_card: card.id_card,
+
+      id_sprint: card.id_sprint,
+
+      tipo_acao: "MOVIMENTACAO",
+
+      acao: `Reprovou o card "${card.titulo}"`
+
+    });
+
+    const io = req.app.get("io");
+
+    if (io) {
+
+      io.to(card.id_projeto).emit("card_moved", atualizado);
+
+    }
+
+    return res.json(atualizado);
+
+  }
+
+  catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+
+      error: "Erro ao reprovar card"
+
+    });
+
+  }
+
 };

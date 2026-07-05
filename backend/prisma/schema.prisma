@@ -57,6 +57,7 @@ model Usuario {
   votos         VotoPoker[]
   notificacoes  Notificacao[]    @relation("DestinoNotificacoes")
   logs          LogAcoes[]
+  comentarios   ComentarioCard[]
   
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -146,6 +147,7 @@ model Card {
   notificacoes   Notificacao[]
   logs           LogAcoes[]
   etiquetas      Etiqueta[]
+  comentarios    ComentarioCard[]
   
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -250,4 +252,20 @@ model Etiqueta {
 
   @@unique([id_projeto, nome])
   @@map("etiquetas")
+}
+
+model ComentarioCard {
+  id_comentario String   @id @default(uuid()) @db.Uuid
+  id_card       String   @db.Uuid
+  id_usuario    String   @db.Uuid
+
+  conteudo      String   @db.Text
+
+  card          Card     @relation(fields: [id_card], references: [id_card], onDelete: Cascade)
+  usuario       Usuario  @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("comentarios_card")
 }

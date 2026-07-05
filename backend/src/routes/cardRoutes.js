@@ -8,6 +8,8 @@ import {
   excluirCard,
   atualizarStatusCard,
   reordenarCards,
+  aprovarCard,
+  reprovarCard,
 } from "../controllers/cardController.js";
 
 const router = express.Router();
@@ -31,6 +33,13 @@ router.delete("/cards/:id", verifyFirebaseToken, excluirCard);
 // Atualizar status do card (drag & drop)
 router.patch("/cards/:id/status", verifyFirebaseToken, atualizarStatusCard);
 
+// Reordenar cards
 router.patch("/cards/:id/reordenar", verifyFirebaseToken, reordenarCards);
+
+// Aprovar card (Tester → Concluído)
+router.patch("/cards/:id/aprovar", verifyFirebaseToken, aprovarCard);
+
+// Reprovar card (Tester → Em Andamento)
+router.patch("/cards/:id/reprovar", verifyFirebaseToken, reprovarCard);
 
 export default router;
