@@ -58,7 +58,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
             setPrazo('');
             setIsModalOpen(false);
         } catch (error) {
-            setCreateError('Erro ao criar projeto. Tente novamente.');
+            setCreateError('Erro ao criar quadro. Tente novamente.');
         } finally {
             setCreating(false);
         }
@@ -69,7 +69,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
         return (
             <div className="w-full max-w-4xl mx-auto px-4 py-16 flex flex-col items-center justify-center">
                 <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4" />
-                <p className="text-sm font-semibold text-slate-500">Carregando seus projetos...</p>
+                <p className="text-sm font-semibold text-slate-500">Carregando seus quadros...</p>
             </div>
         );
     }
@@ -83,7 +83,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                     <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input
                         type="text"
-                        placeholder="Pesquisar projeto..."
+                        placeholder="Pesquisar quadro..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 shadow-sm"
@@ -95,7 +95,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                         onClick={() => setShowArchived(false)}
                         className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${!showArchived ? 'bg-brand-50 text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
-                        Projetos Ativos
+                        Quadros Ativos
                     </button>
                     <button
                         onClick={() => setShowArchived(true)}
@@ -188,10 +188,10 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                 <div className="text-center py-16 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
                     <Briefcase className="mx-auto text-slate-400 mb-3" size={40} />
                     <h3 className="font-bold text-lg text-slate-800">
-                        {projects.length === 0 ? 'Você ainda não participa de nenhum projeto' : 'Nenhum projeto encontrado'}
+                        {projects.length === 0 ? 'Você ainda não participa de nenhum quadro' : 'Nenhum quadro encontrado'}
                     </h3>
                     {projects.length === 0 && (
-                        <p className="text-sm text-slate-500 mt-2">Crie um novo projeto para começar a gerenciar suas tarefas.</p>
+                        <p className="text-sm text-slate-500 mt-2">Crie um novo quadro para começar a gerenciar suas tarefas.</p>
                     )}
                 </div>
             )}
@@ -203,7 +203,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                     className="flex items-center justify-center gap-2 bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm px-6 py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand-500/20 active:scale-95 shadow-md shadow-brand-500/10"
                 >
                     <Plus size={18} />
-                    Novo Projeto
+                    Novo Quadro
                 </button>
             </div>
 
@@ -219,7 +219,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                             <div>
                                 <h2 className="text-xl font-extrabold text-brand-600 flex items-center gap-2">
                                     <Briefcase size={20} />
-                                    Criar Novo Projeto
+                                    Criar Novo Quadro
                                 </h2>
                                 <p className="text-xs text-slate-400 mt-1">Insira os detalhes e prazos para o novo espaço ágil.</p>
                             </div>
@@ -244,7 +244,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                             {/* Campo Nome */}
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    Nome do Projeto
+                                    Nome do Quadro
                                 </label>
                                 <input
                                     type="text"
@@ -266,7 +266,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                                     rows="3"
                                     value={descricao}
                                     onChange={(e) => setDescricao(e.target.value)}
-                                    placeholder="Descreva de forma simples o escopo deste projeto para a equipe..."
+                                    placeholder="Descreva de forma simples o escopo deste quadro para a equipe..."
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400 resize-none leading-relaxed"
                                 />
                             </div>
@@ -304,7 +304,7 @@ export default function ProjectList({ projects, projectsLoading, onSelectProject
                                     className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-xs transition-all shadow-md shadow-brand-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {creating && <Loader2 size={14} className="animate-spin" />}
-                                    {creating ? 'Criando...' : 'Criar Projeto'}
+                                    {creating ? 'Criando...' : 'Criar Quadro'}
                                 </button>
                             </div>
 

@@ -1733,7 +1733,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                   <button
                     onClick={() => setIsActivityLogsModalOpen(true)}
                     className="p-2.5 text-slate-500 hover:text-[#320066] hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shrink-0"
-                    title="Histórico de Atividades do Projeto"
+                    title="Histórico de Atividades do Quadro"
                   >
                     <History size={16} />
                   </button>
@@ -2561,8 +2561,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
               <Settings className="text-brand-600" size={28} />
               <div>
-                <h2 className="text-xl font-extrabold text-slate-800">Configurações do Projeto</h2>
-                <p className="text-slate-500 text-sm">Gerencie os detalhes básicos, prazos e encerramento do projeto.</p>
+                <h2 className="text-xl font-extrabold text-slate-800">Configurações do Quadro</h2>
+                <p className="text-slate-500 text-sm">Gerencie os detalhes básicos, prazos e encerramento do quadro.</p>
               </div>
             </div>
 
@@ -2570,14 +2570,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                 <AlertTriangle size={36} className="text-orange-400 mb-3" />
                 <h3 className="text-lg font-bold text-slate-700">Acesso Restrito</h3>
-                <p className="text-sm text-slate-500 text-center max-w-sm mt-1">Apenas os usuários com perfil de <strong className="text-brand-600">GERENTE</strong> podem visualizar ou alterar as configurações deste projeto.</p>
+                <p className="text-sm text-slate-500 text-center max-w-sm mt-1">Apenas os usuários com perfil de <strong className="text-brand-600">GERENTE</strong> podem visualizar ou alterar as configurações deste quadro.</p>
               </div>
             ) : (
               <div className="space-y-8">
                 {/* Formulário de Edição */}
                 <form onSubmit={handleUpdateSettings} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Nome do Projeto</label>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Nome do Quadro</label>
                     <input
                       type="text"
                       required
@@ -2687,12 +2687,12 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     <div className="p-4 rounded-xl border border-orange-200 bg-orange-50/50 flex flex-col justify-between">
                       <div>
                         <h4 className="font-bold text-orange-800 text-sm">
-                          {project.arquivado ? 'Desarquivar Projeto' : 'Arquivar Projeto'}
+                          {project.arquivado ? 'Desarquivar Quadro' : 'Arquivar Quadro'}
                         </h4>
                         <p className="text-xs text-orange-700 mt-1 mb-4 leading-relaxed">
                           {project.arquivado
-                            ? 'O projeto voltará a aparecer no seu Dashboard principal e ficará ativo novamente.'
-                            : 'O projeto não aparecerá mais no Dashboard principal. Todas as tarefas e dados ficarão salvos para consultas futuras.'
+                            ? 'O quadro voltará a aparecer no seu Dashboard principal e ficará ativo novamente.'
+                            : 'O quadro não aparecerá mais no Dashboard principal. Todas as tarefas e dados ficarão salvos para consultas futuras.'
                           }
                         </p>
                       </div>
@@ -2708,14 +2708,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                       <div>
                         <h4 className="font-bold text-rose-800 text-sm">Excluir Definitivamente</h4>
                         <p className="text-xs text-rose-700 mt-1 mb-4 leading-relaxed">
-                          Isso apagará o projeto permanentemente e todas as tarefas associadas. Essa ação não pode ser desfeita!
+                          Isso apagará o quadro permanentemente e todas as tarefas associadas. Essa ação não pode ser desfeita!
                         </p>
                       </div>
                       <button
                         onClick={() => setIsDeleteModalOpen(true)}
                         className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors flex justify-center items-center gap-2 shadow-sm"
                       >
-                        <Trash2 size={14} /> Excluir Projeto
+                        <Trash2 size={14} /> Excluir Quadro
                       </button>
                     </div>
                   </div>
@@ -2882,12 +2882,12 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <Archive size={24} />
             </div>
             <h3 className="text-lg font-extrabold text-slate-800 mb-2">
-              {project.arquivado ? 'Desarquivar este projeto?' : 'Arquivar este projeto?'}
+              {project.arquivado ? 'Desarquivar este quadro?' : 'Arquivar este quadro?'}
             </h3>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               {project.arquivado
-                ? <>Tem certeza que deseja desarquivar <strong>{project.nome}</strong>? Ele voltará a aparecer na sua lista de projetos ativos.</>
-                : <>Tem certeza que deseja arquivar <strong>{project.nome}</strong>? Ele deixará de aparecer no dashboard principal, mas seus dados continuarão salvos.</>
+                ? <>Tem certeza que deseja desarquivar <strong>{project.nome}</strong>? Ele voltará a aparecer na sua lista de quadros ativos.</>
+                : <>Tem certeza que deseja arquivar o quadro <strong>{project.nome}</strong>? Ele deixará de aparecer na lista principal.</>
               }
             </p>
             <div className="flex gap-3 justify-center">
@@ -2915,7 +2915,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <div className="mx-auto w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
               <Trash2 size={24} />
             </div>
-            <h3 className="text-lg font-extrabold text-slate-800 mb-2">Excluir projeto definitivamente?</h3>
+            <h3 className="text-lg font-extrabold text-slate-800 mb-2">Excluir quadro definitivamente?</h3>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               Você está prestes a excluir <strong>{project.nome}</strong> permanentemente. Todas as tarefas, logs e membros serão removidos. <br /><br />Esta ação é irreversível. Deseja continuar?
             </p>
@@ -2954,9 +2954,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             <div className="mx-auto w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-4">
               <Trash2 size={24} />
             </div>
-            <h3 className="text-lg font-extrabold text-slate-800 mb-2">Remover membro do projeto?</h3>
+            <h3 className="text-lg font-extrabold text-slate-800 mb-2">Remover membro do quadro?</h3>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              Tem certeza que deseja remover <strong>{memberToRemove.nome}</strong> do projeto? O membro perderá acesso a todas as tarefas e recursos.
+              Tem certeza que deseja remover <strong>{memberToRemove.nome}</strong> do quadro? O membro perderá acesso a todas as tarefas e recursos.
             </p>
             <div className="flex gap-3 justify-center">
               <button
