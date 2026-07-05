@@ -1952,20 +1952,19 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                     {isAlta ? 'ALTA PRIORIDADE' : isMedia ? 'MÉDIA PRIORIDADE' : 'BAIXA PRIORIDADE'}
                                   </span>
                                 )}
+                                {card.em_risco && (
+                                  <AlertTriangle 
+                                    size={14} 
+                                    className="text-orange-500 animate-pulse shrink-0" 
+                                    title="Atraso Sinalizado" 
+                                  />
+                                )}
                               </div>
 
                               {/* Título do Card */}
                               <h4 className="font-extrabold text-sm text-slate-800 leading-snug group-hover:text-brand-700 transition-colors">
                                 {card.titulo}
                               </h4>
-
-                              {/* Warning de Atraso */}
-                              {card.atrasado && (
-                                <div className="mt-2.5 flex items-center gap-1.5 bg-orange-50 border border-orange-100 text-orange-800 text-[9px] font-bold px-2 py-1 rounded-lg">
-                                  <AlertTriangle size={11} className="text-orange-500 shrink-0" />
-                                  <span>ATRASO SINALIZADO</span>
-                                </div>
-                              )}
 
                                {/* Divisor */}
                               <div className="my-3 border-t border-slate-100" />
