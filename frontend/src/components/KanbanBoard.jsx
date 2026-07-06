@@ -1688,7 +1688,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                             >
                               <option value="">Todos</option>
                               <option value="unassigned">Sem responsável</option>
-                              {(project.membros || []).map(m => (
+                              {members.map(m => (
                                 <option key={m.id_usuario} value={m.id_usuario}>
                                   {m.nome}
                                 </option>
@@ -2546,7 +2546,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
         ) : activeTab === 'metrics' ? (
           /* ================= TELA MÉTRICAS ================= */
           <div className="flex-1 overflow-y-auto no-scrollbar pb-10 mt-6">
-             <RelatoriosPage projectId={project.id_projeto} sprints={sprints} />
+             <RelatoriosPage projectId={project.id_projeto} sprints={sprints} project={project} />
           </div>
         ) : (
           /* ================= TELA CONFIGURAÇÕES ================= */
