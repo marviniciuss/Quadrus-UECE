@@ -7,13 +7,15 @@ import {
     sendEmailVerification 
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig.js';
-import { KeyRound, Mail, ShieldAlert, Sparkles, User, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import api from '../utils/api.js';
+import { KeyRound, Mail, ShieldAlert, Sparkles, User, ArrowLeft, CheckCircle2, AtSign } from 'lucide-react';
 
 export default function LoginScreen({ onLoginSuccess }) {
     // viewMode pode ser: 'login', 'register', 'forgot_password'
     const [viewMode, setViewMode] = useState('login');
     
     const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     
@@ -67,15 +69,41 @@ export default function LoginScreen({ onLoginSuccess }) {
             return;
         }
 
+        // Validar username
+        const usernameRegex = /^[a-z0-9_]{3,20}$/;
+        if (username && !usernameRegex.test(username)) {
+            setError('Nome de usuário inválido. Use apenas letras minúsculas, números e underline (3-20 caracteres).');
+            setLoading(false);
+            return;
+        }
+
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(userCredential.user, { displayName: name });
+
+            // Sincronizar com o backend PostgreSQL (com username)
+            try {
+                const token = await userCredential.user.getIdToken();
+                await api.post('/api/usuarios', { nome: name, email, username: username || undefined }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (dbErr) {
+                console.error('Erro ao sincronizar usuário com o banco:', dbErr);
+                const errorMsg = dbErr.response?.data?.error || 'Erro ao criar usuário no banco de dados.';
+                // Rollback: excluir o usuário criado no Firebase
+                await userCredential.user.delete();
+                setError(errorMsg);
+                setLoading(false);
+                return;
+            }
+
             // Envia e-mail de verificação
             await sendEmailVerification(userCredential.user);
             // Desloga o usuário recém-criado para que ele faça login após verificar o e-mail
             await auth.signOut();
             // Redireciona para a tela de login com mensagem de sucesso
             setPassword('');
+            setUsername('');
             setViewMode('login');
             setSuccessMessage('Conta criada com sucesso! Enviamos um link de verificação para o seu e-mail. Confirme seu e-mail antes de fazer login.');
         } catch (err) {
@@ -241,6 +269,7 @@ export default function LoginScreen({ onLoginSuccess }) {
                         className="space-y-5 animate-fade-in"
                     >
                         {viewMode === 'register' && (
+                            <>
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
                                     Nome Completo
@@ -257,6 +286,24 @@ export default function LoginScreen({ onLoginSuccess }) {
                                     />
                                 </div>
                             </div>
+                            <div className="space-y-1.5">
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    Nome de Usuário
+                                </label>
+                                <div className="relative">
+                                    <AtSign className="absolute left-3 top-3 text-slate-400" size={18} />
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                                        placeholder="seu_username"
+                                        maxLength={20}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-slate-500">Usado para menções (@). Apenas letras minúsculas, números e underline.</p>
+                            </div>
+                            </>
                         )}
 
                         {/* Input E-mail */}

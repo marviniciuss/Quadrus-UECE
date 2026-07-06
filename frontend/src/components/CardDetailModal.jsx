@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api.js';
 import { socket, joinPokerRoom, leavePokerRoom } from '../utils/socket.js';
+import { marked } from 'marked';
 import {
   Calendar,
   X,
@@ -12,7 +13,10 @@ import {
   RotateCcw,
   Edit,
   Check,
-  Award
+  Award,
+  ChevronDown,
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 
 // Helper para gerar iniciais de fallback para avatares
@@ -34,6 +38,23 @@ function AvatarWithFallback({ nome, foto, className = '', title }) {
       }}
     />
   );
+}
+
+// Configuração do marked para links seguros
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+// Helper para renderizar Markdown com destaque de menções @username
+function renderMarkdown(text) {
+  if (!text) return '';
+  // Primeiro, processa menções @username antes do marked
+  const withMentions = text.replace(
+    /@([a-z0-9_]{1,20})/g,
+    '<span class="mention-highlight" style="color: #320066; font-weight: 700; background: #f3e8ff; padding: 1px 4px; border-radius: 4px;">@$1</span>'
+  );
+  return marked.parse(withMentions);
 }
 
 const presetColors = {
@@ -71,6 +92,82 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
   const [rejectionComment, setRejectionComment] = useState('');
   const [showRiscoInput, setShowRiscoInput] = useState(false);
   const [riscoJustificativa, setRiscoJustificativa] = useState('');
+
+  // Estados para Menção (@) e Edição/Exclusão de Comentários
+  const [mentionState, setMentionState] = useState({
+    show: false,
+    query: '',
+    target: null, // 'description', 'comment', ou 'comment-edit-{id}'
+    index: -1,
+    cursorPos: -1
+  });
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+
+  // Interceptador para abrir lista de membros ao digitar '@'
+  const checkMention = (text, selectionStart, targetType) => {
+    const textBeforeCursor = text.slice(0, selectionStart);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIdx + 1);
+      // Se não houver espaços entre o '@' e o cursor
+      if (!/\s/.test(textAfterAt)) {
+        setMentionState({
+          show: true,
+          query: textAfterAt.toLowerCase(),
+          target: targetType,
+          index: lastAtIdx,
+          cursorPos: selectionStart
+        });
+        return;
+      }
+    }
+    setMentionState({ show: false, query: '', target: null, index: -1, cursorPos: -1 });
+  };
+
+  const handleSelectMention = (member) => {
+    const username = member.usuario.username || member.usuario.nome.toLowerCase().replace(/\s+/g, '_');
+    
+    let textareaId = '';
+    if (mentionState.target === 'description') textareaId = 'desc-textarea';
+    else if (mentionState.target === 'comment') textareaId = 'comment-textarea';
+    else if (mentionState.target?.startsWith('comment-edit-')) textareaId = `comment-edit-textarea-${mentionState.target.split('comment-edit-')[1]}`;
+
+    const textarea = document.getElementById(textareaId);
+    if (!textarea) return;
+
+    const text = textarea.value;
+    const before = text.slice(0, mentionState.index);
+    const after = text.slice(mentionState.cursorPos);
+    const mentionText = `@${username} `;
+    const newValue = before + mentionText + after;
+
+    if (mentionState.target === 'description') {
+      setNewDescriptionText(newValue);
+    } else if (mentionState.target === 'comment') {
+      setNewCommentText(newValue);
+    } else if (mentionState.target?.startsWith('comment-edit-')) {
+      setEditingCommentText(newValue);
+    }
+
+    setMentionState({ show: false, query: '', target: null, index: -1, cursorPos: -1 });
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = mentionState.index + mentionText.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 50);
+  };
+
+  // Filtrar membros do projeto com base no query digitado
+  const filteredMembers = useMemo(() => {
+    if (!mentionState.show) return [];
+    return (project.membros || []).filter(m => {
+      const nome = m.usuario.nome.toLowerCase();
+      const userStr = m.usuario.username ? m.usuario.username.toLowerCase() : '';
+      return nome.includes(mentionState.query) || userStr.includes(mentionState.query);
+    });
+  }, [mentionState.show, mentionState.query, project.membros]);
 
   // --- Helpers de Parse e Serialização (Markdown + Metadata) ---
   const parseCardDesc = (desc) => {
@@ -268,61 +365,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     }
   };
 
-  const handleToggleChecklistItem = async (itemIndex) => {
-    if (!selectedCard) return;
-    try {
-      const parsed = parseCardDesc(selectedCard.descricao);
-      let lines = parsed.checklistText.split('\n');
 
-      let matchedCount = -1;
-      for (let i = 0; i < lines.length; i++) {
-        const match = lines[i].match(/^(\s*[-*])\s+\[([ xX])\]\s+(.+)$/);
-        if (match) {
-          matchedCount++;
-          if (matchedCount === itemIndex) {
-            const newCheckedState = match[2].toLowerCase() === 'x' ? ' ' : 'x';
-            lines[i] = `${match[1]} [${newCheckedState}] ${match[3]}`;
-            break;
-          }
-        }
-      }
-
-      const updatedChecklistText = lines.join('\n');
-      const updatedDesc = serializeCardDesc(parsed.descriptionText, updatedChecklistText, parsed.poker, parsed.comments);
-      const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
-      setSelectedCard(res.data);
-      await reloadCardDetail(selectedCard.id_card);
-    } catch (err) {
-      console.error("Erro ao alternar cenário:", err);
-      showToast("Erro ao atualizar cenário de teste.", "error");
-    }
-  };
-
-  const handleCreateChecklistItem = async () => {
-    if (!selectedCard || !newScenarioText.trim()) return;
-    setAddingScenario(true);
-    try {
-      const parsed = parseCardDesc(selectedCard.descricao);
-      let checklistText = parsed.checklistText || '';
-      if (!checklistText.trim()) {
-        checklistText = `### CENÁRIOS DE TESTE\n- [ ] ${newScenarioText.trim()}`;
-      } else {
-        checklistText = checklistText.trim() + `\n- [ ] ${newScenarioText.trim()}`;
-      }
-
-      const updatedDesc = serializeCardDesc(parsed.descriptionText, checklistText, parsed.poker, parsed.comments);
-      const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
-      setSelectedCard(res.data);
-      setNewScenarioText('');
-      setAddingScenario(false);
-      await reloadCardDetail(selectedCard.id_card);
-      showToast("Cenário de teste adicionado.", "success");
-    } catch (err) {
-      console.error("Erro ao adicionar cenário:", err);
-      showToast("Erro ao adicionar cenário de teste.", "error");
-      setAddingScenario(false);
-    }
-  };
 
   const handlePostComment = async () => {
     if (!selectedCard || !newCommentText.trim()) return;
@@ -337,7 +380,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
         autor: autorNome,
         foto: autorFoto,
         texto: newCommentText.trim(),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        email_autor: currentUserEmail // Salvar e-mail do autor para validação de posse
       };
 
       const updatedComments = [...parsed.comments, newComment];
@@ -350,6 +394,45 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     } catch (err) {
       console.error("Erro ao postar comentário:", err);
       showToast("Erro ao postar comentário.", "error");
+    }
+  };
+
+  const handleEditComment = async (commentId, newText) => {
+    if (!newText.trim()) return;
+    try {
+      const parsed = parseCardDesc(selectedCard.descricao);
+      const updatedComments = parsed.comments.map(c => {
+        if (c.id_comentario === commentId) {
+          return { ...c, texto: newText.trim() };
+        }
+        return c;
+      });
+      const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, parsed.poker, updatedComments);
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
+      setSelectedCard(res.data);
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Comentário atualizado com sucesso.", "success");
+    } catch (err) {
+      console.error("Erro ao atualizar comentário:", err);
+      showToast("Erro ao atualizar comentário.", "error");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Deseja realmente excluir este comentário?")) return;
+    try {
+      const parsed = parseCardDesc(selectedCard.descricao);
+      const updatedComments = parsed.comments.filter(c => c.id_comentario !== commentId);
+      const updatedDesc = serializeCardDesc(parsed.descriptionText, parsed.checklistText, parsed.poker, updatedComments);
+      const res = await api.patch(`/api/cards/${selectedCard.id_card}`, { descricao: updatedDesc });
+      setSelectedCard(res.data);
+      await reloadCardDetail(selectedCard.id_card);
+      showToast("Comentário excluído com sucesso.", "success");
+    } catch (err) {
+      console.error("Erro ao excluir comentário:", err);
+      showToast("Erro ao excluir comentário.", "error");
     }
   };
 
@@ -623,9 +706,11 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     const currentEtIds = selectedCard.etiquetas?.map(et => et.id_etiqueta) || [];
     let updatedList;
     if (currentEtIds.includes(idEtiqueta)) {
-      updatedList = currentEtIds.filter(id => id !== idEtiqueta);
+      // Desmarcar se já está selecionada
+      updatedList = [];
     } else {
-      updatedList = [...currentEtIds, idEtiqueta];
+      // Selecionar apenas essa (substitui qualquer anterior)
+      updatedList = [idEtiqueta];
     }
     await handleUpdateCardField('id_etiquetas', updatedList);
   };
@@ -664,10 +749,28 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
     autor: c.usuario?.nome || 'Usuário',
     foto: c.usuario?.foto || null,
     texto: c.conteudo,
-    createdAt: c.createdAt
+    createdAt: c.createdAt,
+    isDbComment: true
   }));
 
-  const allComments = [...parsed.comments, ...dbComments].sort(
+  const parsedComments = (parsed.comments || []).map(c => ({
+    ...c,
+    isDbComment: false
+  }));
+
+  const allComments = [...parsedComments, ...dbComments].map(c => {
+    if (c.email_autor) {
+      const membro = project.membros?.find(m => m.usuario?.email === c.email_autor);
+      if (membro) {
+        return {
+          ...c,
+          autor: membro.usuario.nome,
+          foto: membro.usuario.foto
+        };
+      }
+    }
+    return c;
+  }).sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
@@ -682,13 +785,24 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-brand-50 border border-brand-100 text-brand-700 rounded-md">
-              {selectedCard.status}
+            <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border ${
+              selectedCard.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+              selectedCard.status === 'EM_ANDAMENTO' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+              selectedCard.status === 'HOMOLOGACAO' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+              'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              {selectedCard.status?.replace(/_/g, ' ')}
             </span>
             {selectedCard.sprint && (
-              <span className="text-xs text-slate-400 font-bold flex items-center gap-1">
-                <Calendar size={12} />
+              <span className="text-xs text-slate-400 font-bold flex items-center gap-1.5">
                 {selectedCard.sprint.nome}
+                {selectedCard.sprint.data_inicio && selectedCard.sprint.data_fim && (
+                  <span className="text-slate-350 font-medium">
+                    - {new Date(selectedCard.sprint.data_inicio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {' até '}
+                    {new Date(selectedCard.sprint.data_fim).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -714,7 +828,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col md:flex-row gap-8">
 
-          {/* Coluna Esquerda: Descrição, Cenários, Discussão */}
+          {/* Coluna Esquerda: Descrição, Discussão */}
           <div className="flex-1 space-y-8 min-w-0 pb-8">
 
             {/* Título (Editável inline) */}
@@ -763,7 +877,10 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             {/* Descrição */}
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Descrição</h3>
+                <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText size={13} className="text-slate-350" />
+                  Descrição
+                </h3>
                 {!isEditingDescription && canEditOrDelete && (
                   <button
                     onClick={() => { setNewDescriptionText(parsed.descriptionText); setIsEditingDescription(true); }}
@@ -775,17 +892,48 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                 )}
               </div>
               {isEditingDescription ? (
-                <div className="space-y-3">
+                <div className="space-y-3 relative">
                   <textarea
-                    rows={4}
+                    id="desc-textarea"
+                    rows={6}
                     value={newDescriptionText}
-                    onChange={(e) => setNewDescriptionText(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
-                    placeholder="Escreva a descrição do quadro..."
+                    onChange={(e) => {
+                      setNewDescriptionText(e.target.value);
+                      checkMention(e.target.value, e.target.selectionStart, 'description');
+                    }}
+                    onKeyUp={(e) => checkMention(e.target.value, e.target.selectionStart, 'description')}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-mono leading-relaxed"
+                    placeholder="Escreva a descrição em Markdown..."
                   />
+                  {/* Dropdown de sugestão para descrição */}
+                  {mentionState.show && mentionState.target === 'description' && filteredMembers.length > 0 && (
+                    <div className="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto w-64 mt-1 top-full left-0">
+                      {filteredMembers.map(m => (
+                        <button
+                          key={m.usuario.id_usuario}
+                          onClick={() => handleSelectMention(m)}
+                          type="button"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                        >
+                          <AvatarWithFallback
+                            nome={m.usuario.nome}
+                            foto={m.usuario.foto}
+                            className="w-6 h-6 rounded-full border border-slate-200"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-700 truncate">{m.usuario.nome}</p>
+                            <p className="text-[10px] text-slate-450 truncate">
+                              {m.usuario.username ? `@${m.usuario.username}` : m.usuario.email}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400">Suporta Markdown: **negrito**, *itálico*, listas, links e @menções.</p>
                   <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => setIsEditingDescription(false)}
+                      onClick={() => { setIsEditingDescription(false); setMentionState({ show: false, query: '', target: null, index: -1, cursorPos: -1 }); }}
                       className="px-3 py-1.5 border border-slate-250 hover:bg-slate-50 text-slate-550 rounded-lg text-xs font-semibold"
                     >
                       Cancelar
@@ -799,9 +947,16 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-slate-650 leading-relaxed whitespace-pre-wrap">
-                  {parsed.descriptionText || <span className="text-slate-400 italic">Nenhuma descrição informada.</span>}
-                </p>
+                <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-4">
+                  {parsed.descriptionText ? (
+                    <div
+                      className="prose prose-xs prose-slate max-w-none text-xs leading-relaxed [&_p]:mb-2 [&_ul]:pl-4 [&_ol]:pl-4 [&_h1]:text-sm [&_h1]:font-extrabold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:text-slate-800 [&_a]:text-brand-600 [&_a]:underline [&_code]:bg-slate-200 [&_code]:px-1 [&_code]:rounded [&_code]:text-[10px]"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(parsed.descriptionText) }}
+                    />
+                  ) : (
+                    <span className="text-xs text-slate-400 italic">Nenhuma descrição informada.</span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -814,25 +969,112 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               </h3>
 
               {/* Lista de Comentários */}
-              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                {allComments.map((comment) => (
-                  <div key={comment.id_comentario} className="flex gap-3 text-left">
-                    <AvatarWithFallback
-                      nome={comment.autor}
-                      foto={comment.foto}
-                      className="w-8 h-8 rounded-full border border-slate-255 bg-slate-100 shrink-0"
-                    />
-                    <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-3 text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-extrabold text-slate-800">{comment.autor}</span>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(comment.createdAt).toLocaleDateString()} às {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+              <div className="space-y-4 pr-1">
+                {allComments.map((comment) => {
+                  const isAuthor = comment.email_autor === currentUserEmail;
+                  const canModifyComment = !comment.isDbComment && (isAuthor || isPO || isGerente);
+                  return (
+                    <div key={comment.id_comentario} className="flex gap-3 text-left">
+                      <AvatarWithFallback
+                        nome={comment.autor}
+                        foto={comment.foto}
+                        className="w-8 h-8 rounded-full border border-slate-255 bg-slate-100 shrink-0"
+                      />
+                      <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl p-3 text-xs relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-extrabold text-[#320066]">{comment.autor}</span>
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(comment.createdAt).toLocaleDateString()} às {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        {editingCommentId === comment.id_comentario ? (
+                          <div className="space-y-2">
+                            <div className="relative">
+                              <textarea
+                                id={`comment-edit-textarea-${comment.id_comentario}`}
+                                rows={2}
+                                value={editingCommentText}
+                                onChange={(e) => {
+                                  setEditingCommentText(e.target.value);
+                                  checkMention(e.target.value, e.target.selectionStart, `comment-edit-${comment.id_comentario}`);
+                                }}
+                                onKeyUp={(e) => checkMention(e.target.value, e.target.selectionStart, `comment-edit-${comment.id_comentario}`)}
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs focus:outline-none focus:border-brand-500 text-slate-700 font-medium block"
+                              />
+                              {/* Dropdown de sugestão no comentário em edição */}
+                              {mentionState.show && mentionState.target === `comment-edit-${comment.id_comentario}` && filteredMembers.length > 0 && (
+                                <div className="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto w-64 mt-1 top-full left-0">
+                                  {filteredMembers.map(m => (
+                                    <button
+                                      key={m.usuario.id_usuario}
+                                      onClick={() => handleSelectMention(m)}
+                                      type="button"
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                                    >
+                                      <AvatarWithFallback
+                                        nome={m.usuario.nome}
+                                        foto={m.usuario.foto}
+                                        className="w-6 h-6 rounded-full border border-slate-200"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-bold text-slate-700 truncate">{m.usuario.nome}</p>
+                                        <p className="text-[10px] text-slate-450 truncate">
+                                          {m.usuario.username ? `@${m.usuario.username}` : m.usuario.email}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => { setEditingCommentId(null); setMentionState({ show: false, query: '', target: null, index: -1, cursorPos: -1 }); }}
+                                className="px-2.5 py-1 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-semibold"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => handleEditComment(comment.id_comentario, editingCommentText)}
+                                className="px-2.5 py-1 bg-[#320066] text-white rounded-lg text-[10px] font-bold"
+                              >
+                                Salvar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              className="text-slate-650 [&_p]:mb-1 [&_strong]:text-slate-800 [&_a]:text-brand-600 [&_a]:underline"
+                              dangerouslySetInnerHTML={{ __html: renderMarkdown(comment.texto) }}
+                            />
+                            {canModifyComment && (
+                              <div className="flex gap-2.5 mt-2 pt-1.5 border-t border-slate-200/40">
+                                <button
+                                  onClick={() => {
+                                    setEditingCommentId(comment.id_comentario);
+                                    setEditingCommentText(comment.texto);
+                                    setMentionState({ show: false, query: '', target: null, index: -1, cursorPos: -1 });
+                                  }}
+                                  className="text-[10px] text-slate-400 hover:text-brand-600 font-semibold"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id_comentario)}
+                                  className="text-[10px] text-slate-400 hover:text-rose-600 font-semibold"
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                      <p className="text-slate-650 whitespace-pre-wrap">{comment.texto}</p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {allComments.length === 0 && (
                   <p className="text-xs text-slate-450 italic text-center py-4">Nenhum comentário postado ainda. Seja o primeiro!</p>
                 )}
@@ -841,13 +1083,45 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               {/* Caixa de Texto de Comentário */}
               <div className="flex items-start gap-3">
                 <div className="flex-1">
-                  <textarea
-                    rows={2}
-                    value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    placeholder="Escreva um comentário... use @ para mencionar alguém"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700"
-                  />
+                  <div className="relative">
+                    <textarea
+                      id="comment-textarea"
+                      rows={2}
+                      value={newCommentText}
+                      onChange={(e) => {
+                        setNewCommentText(e.target.value);
+                        checkMention(e.target.value, e.target.selectionStart, 'comment');
+                      }}
+                      onKeyUp={(e) => checkMention(e.target.value, e.target.selectionStart, 'comment')}
+                      placeholder="Escreva um comentário... use @ para mencionar alguém"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs focus:outline-none focus:border-brand-500 text-slate-700 block"
+                    />
+                    {/* Dropdown de sugestão para novo comentário */}
+                    {mentionState.show && mentionState.target === 'comment' && filteredMembers.length > 0 && (
+                      <div className="absolute z-50 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto w-64 mt-1 top-full left-0">
+                        {filteredMembers.map(m => (
+                          <button
+                            key={m.usuario.id_usuario}
+                            onClick={() => handleSelectMention(m)}
+                            type="button"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                          >
+                            <AvatarWithFallback
+                              nome={m.usuario.nome}
+                              foto={m.usuario.foto}
+                              className="w-6 h-6 rounded-full border border-slate-200"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-700 truncate">{m.usuario.nome}</p>
+                              <p className="text-[10px] text-slate-450 truncate">
+                                {m.usuario.username ? `@${m.usuario.username}` : m.usuario.email}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex justify-end mt-1.5">
                     <button
                       onClick={handlePostComment}
@@ -1075,8 +1349,8 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               {!isPokerActive && !isPokerExpired && selectedCard.story_points !== null && (
                 <div className="space-y-4 text-left">
                   <div className="space-y-2 flex flex-col items-start">
-                    <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-semibold">Pontuação Decidida</h4>
-                    <div className="w-24 h-32 bg-[#320066] hover:bg-[#26004d] text-white border border-[#320066] rounded-2xl flex items-center justify-center shadow-lg shadow-[#320066]/20 transition-all select-none">
+                    <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Pontuação</h4>
+                    <div className="w-20 h-28 bg-[#320066] text-white border border-[#320066] rounded-2xl flex items-center justify-center shadow-lg shadow-[#320066]/20 transition-all select-none">
                       <span className="font-extrabold text-4xl font-mono">{selectedCard.story_points}</span>
                     </div>
                   </div>
@@ -1164,36 +1438,60 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             )}
 
             {/* Responsável */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Responsável</label>
-              <select
-                value={selectedCard.id_responsavel || ''}
-                onChange={(e) => handleUpdateCardField('id_responsavel', e.target.value || null)}
-                disabled={!canEditOrDelete}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
-              >
-                <option value="">Ninguém atribuído</option>
-                {project.membros?.map(m => (
-                  <option key={m.usuario.id_usuario} value={m.usuario.id_usuario}>
-                    {m.usuario.nome} ({m.perfil})
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                {selectedCard.id_responsavel && (() => {
+                  const responsavelMembro = project.membros?.find(m => m.usuario.id_usuario === selectedCard.id_responsavel);
+                  return responsavelMembro ? (
+                    <AvatarWithFallback
+                      nome={responsavelMembro.usuario.nome}
+                      foto={responsavelMembro.usuario.foto}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-slate-200"
+                    />
+                  ) : null;
+                })()}
+                <select
+                  value={selectedCard.id_responsavel || ''}
+                  onChange={(e) => handleUpdateCardField('id_responsavel', e.target.value || null)}
+                  disabled={!canEditOrDelete}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pr-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold disabled:opacity-75 disabled:cursor-not-allowed appearance-none ${selectedCard.id_responsavel ? 'pl-10' : 'pl-3'}`}
+                >
+                  <option value="">Ninguém atribuído</option>
+                  {project.membros?.map(m => (
+                    <option key={m.usuario.id_usuario} value={m.usuario.id_usuario}>
+                      {m.usuario.nome} ({m.perfil})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Prioridade */}
-            <div className="space-y-1">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-semibold">Prioridade</label>
-              <select
-                value={selectedCard.prioridade}
-                onChange={(e) => handleUpdateCardField('prioridade', e.target.value)}
-                disabled={!canEditOrDelete}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs focus:outline-none focus:border-[#320066] text-slate-700 font-bold disabled:opacity-75 disabled:cursor-not-allowed"
-              >
-                <option value="BAIXA">BAIXA</option>
-                <option value="MEDIA">MÉDIA</option>
-                <option value="ALTA">ALTA</option>
-              </select>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridade</label>
+              <div className="relative">
+                <select
+                  value={selectedCard.prioridade}
+                  onChange={(e) => handleUpdateCardField('prioridade', e.target.value)}
+                  disabled={!canEditOrDelete}
+                  className={`w-full border rounded-xl py-2.5 px-3 text-xs focus:outline-none font-extrabold disabled:opacity-75 disabled:cursor-not-allowed appearance-none ${
+                    selectedCard.prioridade === 'ALTA' ? 'bg-rose-50 border-rose-200 text-rose-700 focus:border-rose-400' :
+                    selectedCard.prioridade === 'MEDIA' ? 'bg-amber-50 border-amber-200 text-amber-700 focus:border-amber-400' :
+                    'bg-emerald-50 border-emerald-200 text-emerald-700 focus:border-emerald-400'
+                  }`}
+                >
+                  <option value="BAIXA">BAIXA</option>
+                  <option value="MEDIA">MÉDIA</option>
+                  <option value="ALTA">ALTA</option>
+                </select>
+                <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                  selectedCard.prioridade === 'ALTA' ? 'text-rose-400' :
+                  selectedCard.prioridade === 'MEDIA' ? 'text-amber-400' :
+                  'text-emerald-400'
+                }`} />
+              </div>
             </div>
 
             {/* Etiquetas */}
@@ -1219,37 +1517,51 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
             </div>
 
             {/* Anexos (Apenas Links) */}
-            <div className="space-y-3 bg-slate-50/50 border border-slate-100 rounded-2xl p-4.5 p-4 text-left">
+            <div className="space-y-3 bg-slate-50/50 border border-slate-100 rounded-2xl p-4 text-left">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Anexos</h4>
 
               {/* Lista de Anexos */}
               <div className="space-y-2">
-                {selectedCard.anexos?.map((anexo) => (
-                  <div
-                    key={anexo.id_anexo}
-                    className="flex items-center justify-between p-2.5 bg-white border border-slate-200/80 rounded-xl hover:border-slate-350 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Link size={14} className="text-slate-400 shrink-0" />
-                      <a
-                        href={anexo.url_arquivo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-bold text-[#320066] hover:text-purple-750 truncate"
-                      >
-                        {anexo.nome_arquivo}
-                      </a>
+                {selectedCard.anexos?.map((anexo) => {
+                  // Extrair domínio do URL para subtext
+                  let domain = '';
+                  try {
+                    domain = new URL(anexo.url_arquivo).hostname.replace('www.', '');
+                  } catch (e) {
+                    domain = 'Link Externo';
+                  }
+                  return (
+                    <div
+                      key={anexo.id_anexo}
+                      className="flex items-center justify-between p-2.5 bg-white border border-slate-200/80 rounded-xl hover:border-slate-350 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 bg-brand-50 border border-brand-100 rounded-lg flex items-center justify-center shrink-0">
+                          <ExternalLink size={14} className="text-brand-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <a
+                            href={anexo.url_arquivo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-bold text-[#320066] hover:text-purple-750 truncate block"
+                          >
+                            {anexo.nome_arquivo}
+                          </a>
+                          <span className="text-[10px] text-slate-400 truncate block">{domain}</span>
+                        </div>
+                      </div>
+                      {canEditOrDelete && (
+                        <button
+                          onClick={() => handleDeleteAttachment(anexo.id_anexo)}
+                          className="text-slate-300 hover:text-rose-600 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
-                    {canEditOrDelete && (
-                      <button
-                        onClick={() => handleDeleteAttachment(anexo.id_anexo)}
-                        className="text-slate-400 hover:text-rose-600 p-0.5 rounded"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
                 {(!selectedCard.anexos || selectedCard.anexos.length === 0) && (
                   <p className="text-[11px] text-slate-400 italic">Nenhum anexo adicionado.</p>
                 )}

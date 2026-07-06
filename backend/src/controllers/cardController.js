@@ -174,6 +174,12 @@ export const criarCard = async (req, res) => {
       },
     });
 
+    // Notificar menções na criação (se houver)
+    if (descricao) {
+      const io = req.app.get('io');
+      await processMentions(card, "", descricao, req, io);
+    }
+
     await registrarLog({
       id_usuario: membro.id_usuario,
       acao: `Criou o card "${card.titulo}"`,
@@ -439,11 +445,16 @@ export const atualizarCard = async (req, res) => {
       },
     });
 
+    const io = req.app.get('io');
+    
+    // Processar menções e enviar notificações
+    if (descricao !== undefined) {
+      await processMentions(cardAtualizado, card.descricao, descricao, req, io);
+    }
+
     const newPoker = parsePokerMetadata(cardAtualizado.descricao);
     const oldActive = oldPoker && oldPoker.active;
     const newActive = newPoker && newPoker.active;
-    const io = req.app.get('io');
-
     if (!oldActive && newActive) {
       // 1. Criar notificações para todos os DEV do projeto
       try {
@@ -1256,3 +1267,136 @@ export const sinalizarRiscoCard = async (req, res) => {
     return res.status(500).json({ error: "Erro ao atualizar status de risco do card" });
   }
 };
+
+/**
+ * Helper para processar menções (@username) na descrição e comentários e disparar notificações.
+ */
+async function processMentions(card, oldDesc, newDesc, req, io) {
+  try {
+    if (!newDesc) return;
+
+    // Helper de parsing para separar texto principal de comentários
+    const parseDesc = (desc) => {
+      let rawText = desc || '';
+      let comments = [];
+
+      const commentsRegex = /<!-- DISCUSSION:\s*(\[.*?\])\s*-->/;
+      const commentsMatch = rawText.match(commentsRegex);
+      if (commentsMatch) {
+        try {
+          comments = JSON.parse(commentsMatch[1]);
+        } catch (e) {}
+        rawText = rawText.replace(commentsRegex, '').trim();
+      }
+
+      const pokerRegex = /<!-- POKER_METADATA:\s*({.*?})\s*-->/;
+      rawText = rawText.replace(pokerRegex, '').trim();
+
+      return {
+        descriptionText: rawText,
+        comments
+      };
+    };
+
+    const oldParsed = parseDesc(oldDesc);
+    const newParsed = parseDesc(newDesc);
+
+    // Extrair menções do tipo @username
+    const extractMentions = (text) => {
+      if (!text) return [];
+      const regex = /@([a-z0-9_]{3,20})/g;
+      const matches = text.match(regex) || [];
+      return matches.map(m => m.slice(1).toLowerCase());
+    };
+
+    // Novas menções na descrição
+    const oldDescMentions = extractMentions(oldParsed.descriptionText);
+    const newDescMentions = extractMentions(newParsed.descriptionText);
+    const newDescOnly = newDescMentions.filter(m => !oldDescMentions.includes(m));
+
+    // Novas menções em comentários novos
+    const oldCommentIds = new Set((oldParsed.comments || []).map(c => c.id_comentario));
+    const newComments = (newParsed.comments || []).filter(c => !oldCommentIds.has(c.id_comentario));
+    
+    const newCommentMentions = [];
+    for (const c of newComments) {
+      const mentions = extractMentions(c.texto);
+      for (const m of mentions) {
+        if (!newCommentMentions.includes(m)) {
+          newCommentMentions.push(m);
+        }
+      }
+    }
+
+    // Unir menções a notificar
+    const mentionsToNotify = new Map();
+    for (const m of newDescOnly) {
+      mentionsToNotify.set(m, 'desc');
+    }
+    for (const m of newCommentMentions) {
+      mentionsToNotify.set(m, mentionsToNotify.has(m) ? 'both' : 'comment');
+    }
+
+    if (mentionsToNotify.size === 0) return;
+
+    // Buscar dados do autor da menção
+    const autor = await prisma.usuario.findUnique({
+      where: { email: req.user.email }
+    });
+    const autorNome = autor?.nome || req.user.name;
+
+    for (const [username, type] of mentionsToNotify.entries()) {
+      // Procurar usuário pelo username
+      const targetUser = await prisma.usuario.findUnique({
+        where: { username }
+      });
+      if (!targetUser) continue;
+
+      // Não notificar a si próprio
+      if (targetUser.email === req.user.email) continue;
+
+      // Verificar se ele é membro do projeto
+      const targetMembro = await prisma.membroProjeto.findFirst({
+        where: {
+          id_projeto: card.id_projeto,
+          id_usuario: targetUser.id_usuario
+        }
+      });
+      if (!targetMembro) continue;
+
+      let mensagem = '';
+      if (type === 'desc') {
+        mensagem = `${autorNome} mencionou você na descrição do card "${card.titulo}".`;
+      } else if (type === 'comment') {
+        mensagem = `${autorNome} mencionou você em um comentário no card "${card.titulo}".`;
+      } else {
+        mensagem = `${autorNome} mencionou você no card "${card.titulo}".`;
+      }
+
+      const notificacao = await prisma.notificacao.create({
+        data: {
+          id_usuario_destino: targetUser.id_usuario,
+          id_card_origem: card.id_card,
+          id_projeto_origem: card.id_projeto,
+          mensagem
+        },
+        include: {
+          card: {
+            select: {
+              id_card: true,
+              titulo: true,
+              status: true,
+              id_projeto: true
+            }
+          }
+        }
+      });
+
+      if (io) {
+        io.to(card.id_projeto).emit('nova_notificacao', notificacao);
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao processar menções:", err);
+  }
+}

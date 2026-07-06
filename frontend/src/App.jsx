@@ -26,6 +26,7 @@ export default function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [initialOpenCardId, setInitialOpenCardId] = useState(null);
 
   // Estado do usuário no banco de dados (para ID de notificações)
   const [dbUser, setDbUser] = useState(null);
@@ -202,6 +203,25 @@ export default function App() {
     }
   };
 
+  const handleNotificationClick = async (n) => {
+    // Se for convite de projeto ou solicitação de homologação, não faz nada no clique do corpo (espera botão)
+    if ((n.id_projeto_origem && !n.id_card_origem) || n.solicitacao_homologacao) {
+      return;
+    }
+
+    if (!n.lida) {
+      await handleMarkAsRead(n.id_notificacao);
+    }
+
+    if (n.id_card_origem && n.id_projeto_origem) {
+      const targetProj = projects.find(p => p.id_projeto === n.id_projeto_origem);
+      if (targetProj) {
+        setInitialOpenCardId(n.id_card_origem);
+        await handleSelectProject(targetProj);
+      }
+    }
+  };
+
   const formatTimeAgo = (dateStr) => {
     const d = new Date(dateStr);
     const now = new Date();
@@ -244,7 +264,7 @@ export default function App() {
       const currentUserInDb = dbUserRef.current;
       if (currentUserInDb && data.id_usuario === currentUserInDb.id_usuario) {
         setDbUser(prev => {
-          const updated = { ...prev, nome: data.nome, foto: data.foto };
+          const updated = { ...prev, nome: data.nome, foto: data.foto, username: data.username };
           dbUserRef.current = updated;
           return updated;
         });
@@ -477,9 +497,9 @@ export default function App() {
                     notifications.map((n) => (
                       <div
                         key={n.id_notificacao}
-                        onClick={() => !n.lida && !n.id_projeto_origem && !n.solicitacao_homologacao && handleMarkAsRead(n.id_notificacao)}
+                        onClick={() => handleNotificationClick(n)}
                         className={`text-xs px-3 py-2.5 rounded-lg transition-colors ${
-                          (n.id_projeto_origem || n.solicitacao_homologacao) ? '' : 'cursor-pointer'
+                          ((n.id_projeto_origem && !n.id_card_origem) || n.solicitacao_homologacao) ? '' : 'cursor-pointer'
                         } ${
                           n.lida
                             ? 'text-slate-400 hover:bg-slate-50'
@@ -487,7 +507,7 @@ export default function App() {
                         }`}
                       >
                         <p className="leading-relaxed">{n.mensagem}</p>
-                        {n.id_projeto_origem && !n.lida && (
+                        {n.id_projeto_origem && !n.id_card_origem && !n.lida && (
                           <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => handleAcceptInvite(n.id_notificacao)}
@@ -565,6 +585,8 @@ export default function App() {
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             onLogout={handleLogout}
+            initialOpenCardId={initialOpenCardId}
+            onClearInitialOpenCardId={() => setInitialOpenCardId(null)}
           />
         )}
       </main>

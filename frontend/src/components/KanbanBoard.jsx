@@ -79,7 +79,7 @@ function AvatarWithFallback({ nome, foto, className = '', title }) {
   );
 }
 
-export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction, sidebarOpen, setSidebarOpen, onLogout }) {
+export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction, sidebarOpen, setSidebarOpen, onLogout, initialOpenCardId, onClearInitialOpenCardId }) {
   // Ref para acessar o projeto atualizado dentro de callbacks de socket
   const projectRef = useRef(project);
   useEffect(() => {
@@ -120,14 +120,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               usuario: {
                 ...m.usuario,
                 nome: data.nome,
-                foto: data.foto
+                foto: data.foto,
+                username: data.username
               }
             };
           } else {
             return {
               ...m,
               nome: data.nome,
-              foto: data.foto
+              foto: data.foto,
+              username: data.username
             };
           }
         }
@@ -142,7 +144,8 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             responsavel: {
               ...c.responsavel,
               nome: data.nome,
-              foto: data.foto
+              foto: data.foto,
+              username: data.username
             }
           };
         }
@@ -312,6 +315,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Drag and Drop States
   const [draggedCardId, setDraggedCardId] = useState(null);
   const [dragOverCardId, setDragOverCardId] = useState(null);
+
+  // Auto-open card from notification/external deep link
+  useEffect(() => {
+    if (initialOpenCardId) {
+      setSelectedCardId(initialOpenCardId);
+      if (onClearInitialOpenCardId) {
+        onClearInitialOpenCardId();
+      }
+    }
+  }, [initialOpenCardId]);
 
   // Reset invite modal state when closed
   useEffect(() => {
@@ -1001,9 +1014,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   // Alternar etiqueta nos inputs de nova atividade
   const toggleFormEtiqueta = (idEtiqueta) => {
     if (newCardEtiquetas.includes(idEtiqueta)) {
-      setNewCardEtiquetas(newCardEtiquetas.filter(id => id !== idEtiqueta));
+      setNewCardEtiquetas([]);
     } else {
-      setNewCardEtiquetas([...newCardEtiquetas, idEtiqueta]);
+      // Selecionar apenas essa (substitui qualquer anterior)
+      setNewCardEtiquetas([idEtiqueta]);
     }
   };
 

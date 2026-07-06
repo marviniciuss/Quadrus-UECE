@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Check, Loader2, RefreshCw, LogOut } from 'lucide-react';
+import { X, Save, Check, Loader2, RefreshCw, LogOut, AtSign } from 'lucide-react';
 import api from '../utils/api.js';
 
 export default function ProfileModal({ isOpen, onClose, user, onSave, onLogout }) {
   const [nome, setNome] = useState('');
+  const [username, setUsername] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState(null); // null means default (using name)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,6 +13,7 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onLogout }
   useEffect(() => {
     if (user) {
       setNome(user.nome || '');
+      setUsername(user.username || '');
       setSelectedAvatar(user.foto || null);
       setError(null);
     }
@@ -37,7 +39,8 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onLogout }
     try {
       const res = await api.put('/api/usuarios/perfil', {
         nome: nome.trim(),
-        foto: selectedAvatar
+        foto: selectedAvatar,
+        username: username.trim() || null
       });
 
       onSave(res.data);
@@ -101,6 +104,25 @@ export default function ProfileModal({ isOpen, onClose, user, onSave, onLogout }
               readOnly
               className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 font-medium outline-none cursor-not-allowed select-none"
             />
+          </div>
+
+          {/* Username Input */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Nome de Usuário (@)
+            </label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-2.5 text-slate-400" size={16} />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                placeholder="seu_username"
+                maxLength={20}
+                className="w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-medium text-slate-800"
+              />
+            </div>
+            <p className="text-[10px] text-slate-400">Usado para menções (@). Letras minúsculas, números e underline (3-20 caracteres).</p>
           </div>
 
           {/* Avatar Selection */}

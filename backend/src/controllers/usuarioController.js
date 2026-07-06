@@ -70,12 +70,32 @@ export const buscarUsuarioPorId = async (req, res) => {
  */
 export const criarUsuario = async (req, res) => {
   try {
-    const { nome, email } = req.body;
+    const { nome, email, username } = req.body;
 
     if (!nome || !email) {
       return res.status(400).json({
         error: "Nome e email são obrigatórios",
       });
+    }
+
+    // Validar formato do username (se fornecido)
+    const usernameRegex = /^[a-z0-9_]{3,20}$/;
+    if (username && !usernameRegex.test(username)) {
+      return res.status(400).json({
+        error: "Nome de usuário inválido. Use apenas letras minúsculas, números e underline (3-20 caracteres).",
+      });
+    }
+
+    // Verificar unicidade do username (se fornecido)
+    if (username) {
+      const usernameExistente = await prisma.usuario.findUnique({
+        where: { username },
+      });
+      if (usernameExistente) {
+        return res.status(400).json({
+          error: "Este nome de usuário já está em uso.",
+        });
+      }
     }
 
     const usuarioExistente = await prisma.usuario.findUnique({
@@ -85,10 +105,14 @@ export const criarUsuario = async (req, res) => {
     });
 
     if (usuarioExistente) {
-      if (nome && usuarioExistente.nome !== nome) {
+      const updateData = {};
+      if (nome && usuarioExistente.nome !== nome) updateData.nome = nome;
+      if (username && usuarioExistente.username !== username) updateData.username = username;
+
+      if (Object.keys(updateData).length > 0) {
         const usuarioAtualizado = await prisma.usuario.update({
           where: { email },
-          data: { nome },
+          data: updateData,
         });
         return res.status(200).json(usuarioAtualizado);
       }
@@ -99,6 +123,7 @@ export const criarUsuario = async (req, res) => {
       data: {
         nome,
         email,
+        ...(username && { username }),
       },
     });
 
@@ -232,12 +257,19 @@ export const buscarUsuarios = async (req, res) => {
               mode: 'insensitive',
             },
           },
+          {
+            username: {
+              contains: q.trim(),
+              mode: 'insensitive',
+            },
+          },
         ]
       },
       select: {
         id_usuario: true,
         nome: true,
         email: true,
+        username: true,
       },
       take: Math.min(parseInt(limit) || 20, 50),
       orderBy: { email: 'asc' },
@@ -256,12 +288,36 @@ export const buscarUsuarios = async (req, res) => {
 export const atualizarPerfil = async (req, res) => {
   try {
     const email = req.user.email;
-    const { nome, foto } = req.body;
+    const { nome, foto, username } = req.body;
 
     if (!nome) {
       return res.status(400).json({
         error: "Nome é obrigatório",
       });
+    }
+
+    // Validar formato do username (se fornecido)
+    const usernameRegex = /^[a-z0-9_]{3,20}$/;
+    if (username && !usernameRegex.test(username)) {
+      return res.status(400).json({
+        error: "Nome de usuário inválido. Use apenas letras minúsculas, números e underline (3-20 caracteres).",
+      });
+    }
+
+    // Verificar unicidade do username
+    if (username) {
+      const currentUser = await prisma.usuario.findUnique({ where: { email } });
+      const usernameExistente = await prisma.usuario.findFirst({
+        where: {
+          username,
+          NOT: { id_usuario: currentUser.id_usuario },
+        },
+      });
+      if (usernameExistente) {
+        return res.status(400).json({
+          error: "Este nome de usuário já está em uso.",
+        });
+      }
     }
 
     const usuarioAtualizado = await prisma.usuario.update({
@@ -271,6 +327,7 @@ export const atualizarPerfil = async (req, res) => {
       data: {
         nome,
         foto,
+        ...(username !== undefined && { username: username || null }),
       },
     });
 
@@ -291,6 +348,7 @@ export const atualizarPerfil = async (req, res) => {
           id_usuario: usuarioAtualizado.id_usuario,
           nome: usuarioAtualizado.nome,
           foto: usuarioAtualizado.foto,
+          username: usuarioAtualizado.username,
         });
       });
     }
