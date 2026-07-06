@@ -105,17 +105,7 @@ export const criarUsuario = async (req, res) => {
     });
 
     if (usuarioExistente) {
-      const updateData = {};
-      if (nome && usuarioExistente.nome !== nome) updateData.nome = nome;
-      if (username && usuarioExistente.username !== username) updateData.username = username;
-
-      if (Object.keys(updateData).length > 0) {
-        const usuarioAtualizado = await prisma.usuario.update({
-          where: { email },
-          data: updateData,
-        });
-        return res.status(200).json(usuarioAtualizado);
-      }
+      // Retorna o usuário existente sem sobrescrever o nome ou username alterados no perfil
       return res.status(200).json(usuarioExistente);
     }
 
