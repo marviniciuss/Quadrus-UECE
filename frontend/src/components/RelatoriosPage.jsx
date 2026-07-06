@@ -48,43 +48,43 @@ export default function RelatoriosPage({ projectId, sprints = [], project = {} }
         </div>
 
         {/* Stack de KPIs */}
-        <div className="flex flex-col gap-4 justify-between">
+        <div className="grid grid-cols-3 lg:flex lg:flex-col gap-4 justify-between">
           {/* Card 1: Colaboradores Ativos */}
           <div 
             title="Quantidade de membros ativos vinculados a este projeto."
-            className="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
+            className="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl p-3 sm:p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
           >
-            <div className="flex justify-between items-start">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-100">Colaboradores Ativos</span>
-              <Users size={18} className="text-blue-100 opacity-80" />
+            <div className="flex justify-between items-start gap-1">
+              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-blue-100 leading-tight">Colaboradores Ativos</span>
+              <Users size={16} className="text-blue-100 opacity-80 shrink-0" />
             </div>
-            <span className="text-2xl font-extrabold mt-1 font-mono">{totalColaboradores}</span>
+            <span className="text-xl sm:text-2xl font-extrabold mt-1 font-mono">{totalColaboradores}</span>
           </div>
 
           {/* Card 2: Saúde da Sprint */}
           <div 
             title="Porcentagem de tarefas da Sprint ativa que não estão sinalizadas em risco."
-            className="bg-[#21003e] text-white rounded-2xl p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
+            className="bg-[#21003e] text-white rounded-2xl p-3 sm:p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
           >
-            <div className="flex justify-between items-start">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-200">Saúde da Sprint</span>
-              <Gauge size={18} className="text-purple-200 opacity-80" />
+            <div className="flex justify-between items-start gap-1">
+              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-purple-200 leading-tight">Saúde da Sprint</span>
+              <Gauge size={16} className="text-purple-200 opacity-80 shrink-0" />
             </div>
-            <span className="text-2xl font-extrabold mt-1 font-mono">{saudeSprint}%</span>
+            <span className="text-xl sm:text-2xl font-extrabold mt-1 font-mono">{saudeSprint}%</span>
           </div>
 
           {/* Card 3: Progresso da Sprint */}
           <div 
             title="Porcentagem de Story Points entregues (em cards concluídos) em relação ao total planejado para a Sprint ativa."
-            className="bg-gradient-to-br from-emerald-600 to-emerald-500 text-white rounded-2xl p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
+            className="bg-gradient-to-br from-emerald-600 to-emerald-500 text-white rounded-2xl p-3 sm:p-5 shadow-sm flex flex-col justify-between h-[115px] transition-all hover:shadow-md cursor-help"
           >
-            <div className="flex justify-between items-start">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-100">Progresso da Sprint</span>
-              <CheckCircle size={18} className="text-emerald-100 opacity-80" />
+            <div className="flex justify-between items-start gap-1">
+              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-emerald-100 leading-tight">Progresso da Sprint</span>
+              <CheckCircle size={16} className="text-emerald-100 opacity-80 shrink-0" />
             </div>
-            <div className="flex justify-between items-end mt-1">
-              <span className="text-2xl font-extrabold font-mono">{progressoSprint}%</span>
-              <span className="text-[10px] font-bold text-emerald-100/90 font-mono mb-0.5">{completedActivePoints}/{totalActivePoints} pts</span>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mt-1 gap-1">
+              <span className="text-xl sm:text-2xl font-extrabold font-mono leading-none">{progressoSprint}%</span>
+              <span className="text-[8px] sm:text-[10px] font-bold text-emerald-100/90 font-mono mb-0.5 whitespace-nowrap">{completedActivePoints}/{totalActivePoints} pts</span>
             </div>
           </div>
         </div>
