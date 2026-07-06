@@ -2263,8 +2263,9 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                     }
                                     await handleFinishSprintAction(activeSprint, null, unfinishedCards, []);
                                   }}
-                                  disabled={isFinishingSprint}
-                                  className="px-5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold text-xs transition-all shadow-sm active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
+                                  disabled={isFinishingSprint || !(isManager || isPO)}
+                                  title={!(isManager || isPO) ? "Apenas PO ou Gerente do projeto podem encerrar a sprint." : ""}
+                                  className="px-5 py-2.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 hover:text-rose-700 font-bold text-xs transition-all shadow-sm active:scale-95 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {isFinishingSprint ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
                                   Fechar Sprint Atual
