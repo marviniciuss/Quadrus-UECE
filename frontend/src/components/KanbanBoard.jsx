@@ -79,7 +79,7 @@ function AvatarWithFallback({ nome, foto, className = '', title }) {
   );
 }
 
-export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction, sidebarOpen, setSidebarOpen, onLogout, initialOpenCardId, onClearInitialOpenCardId }) {
+export default function KanbanBoard({ project, onUpdateProject, userDisplayName, currentUserEmail, onProjectAction, sidebarOpen, setSidebarOpen, onLogout, initialOpenCardId, onClearInitialOpenCardId, setIsBlockingExit }) {
   // Ref para acessar o projeto atualizado dentro de callbacks de socket
   const projectRef = useRef(project);
   useEffect(() => {
@@ -230,6 +230,23 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
   }, []);
+
+  useEffect(() => {
+    if (setIsBlockingExit) {
+      setIsBlockingExit(isClosingFlowStep2 && migratedCardIds.length > 0);
+    }
+  }, [isClosingFlowStep2, migratedCardIds, setIsBlockingExit]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isClosingFlowStep2 && migratedCardIds.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isClosingFlowStep2, migratedCardIds]);
 
   // Estados do modal de convite
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -1450,7 +1467,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
           {/* Links do Menu */}
           <nav className="space-y-1.5 text-left">
             <button
-              onClick={() => { setActiveTab('board'); setSidebarOpen(false); }}
+              onClick={() => {
+                if (isClosingFlowStep2 && migratedCardIds.length > 0) {
+                  showToast("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição.", "error");
+                  return;
+                }
+                setActiveTab('board');
+                setSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'board'
                 ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
@@ -1461,7 +1485,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             </button>
 
             <button
-              onClick={() => { setActiveTab('sprint'); setSidebarOpen(false); }}
+              onClick={() => {
+                if (isClosingFlowStep2 && migratedCardIds.length > 0) {
+                  showToast("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição.", "error");
+                  return;
+                }
+                setActiveTab('sprint');
+                setSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'sprint'
                 ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
@@ -1472,7 +1503,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             </button>
 
             <button
-              onClick={() => { setActiveTab('metrics'); setSidebarOpen(false); }}
+              onClick={() => {
+                if (isClosingFlowStep2 && migratedCardIds.length > 0) {
+                  showToast("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição.", "error");
+                  return;
+                }
+                setActiveTab('metrics');
+                setSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'metrics'
                 ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
@@ -1483,7 +1521,14 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
             </button>
 
             <button
-              onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
+              onClick={() => {
+                if (isClosingFlowStep2 && migratedCardIds.length > 0) {
+                  showToast("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição.", "error");
+                  return;
+                }
+                setActiveTab('settings');
+                setSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-bold border-l-4 transition-all ${activeTab === 'settings'
                 ? 'bg-brand-50 text-brand-700 shadow-sm border-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'
@@ -2257,11 +2302,10 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               <div className="flex justify-end pt-4 border-t border-slate-100">
                                 <button
                                   onClick={async () => {
-                                    const unfinishedCardIds = unfinishedCards.map(c => c.id_card);
-                                    if (unfinishedCardIds.length > 0) {
-                                      await api.post(`/api/sprints/null/migrar-cards`, { cardIds: unfinishedCardIds, idProjeto: project.id_projeto });
-                                    }
-                                    await handleFinishSprintAction(activeSprint, null, unfinishedCards, []);
+                                    // Just finalize the active sprint, do not migrate anything to null.
+                                    // Selected cards (migratedCardIds) will be migrated to the new sprint when created in step 2.
+                                    // Non-migrated cards will keep their id_sprint pointing to activeSprint and remain in this finalized sprint.
+                                    await handleFinishSprintAction(activeSprint, null, [], []);
                                   }}
                                   disabled={isFinishingSprint || !(isManager || isPO)}
                                   title={!(isManager || isPO) ? "Apenas PO ou Gerente do projeto podem encerrar a sprint." : ""}

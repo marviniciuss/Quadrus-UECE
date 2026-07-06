@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-    signInWithEmailAndPassword, 
-    createUserWithEmailAndPassword, 
-    updateProfile, 
+import {
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword,
+    updateProfile,
     sendPasswordResetEmail,
-    sendEmailVerification 
+    sendEmailVerification
 } from 'firebase/auth';
 import { auth } from '../utils/firebaseConfig.js';
 import api from '../utils/api.js';
@@ -13,12 +13,12 @@ import { KeyRound, Mail, ShieldAlert, Sparkles, User, ArrowLeft, CheckCircle2, A
 export default function LoginScreen({ onLoginSuccess }) {
     // viewMode pode ser: 'login', 'register', 'forgot_password'
     const [viewMode, setViewMode] = useState('login');
-    
+
     const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
@@ -260,49 +260,49 @@ export default function LoginScreen({ onLoginSuccess }) {
                     )}
 
                     {/* Formulários */}
-                    <form 
+                    <form
                         onSubmit={
-                            viewMode === 'login' ? handleLogin : 
-                            viewMode === 'register' ? handleRegister : 
-                            handleForgotPassword
-                        } 
+                            viewMode === 'login' ? handleLogin :
+                                viewMode === 'register' ? handleRegister :
+                                    handleForgotPassword
+                        }
                         className="space-y-5 animate-fade-in"
                     >
                         {viewMode === 'register' && (
                             <>
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    Nome Completo
-                                </label>
-                                <div className="relative">
-                                    <User className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input
-                                        type="text"
-                                        required
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="Seu nome completo"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
-                                    />
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        Nome Completo
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                                        <input
+                                            type="text"
+                                            required
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder="Seu nome completo"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                    Nome de Usuário
-                                </label>
-                                <div className="relative">
-                                    <AtSign className="absolute left-3 top-3 text-slate-400" size={18} />
-                                    <input
-                                        type="text"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                                        placeholder="seu_username"
-                                        maxLength={20}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
-                                    />
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        Nome de Usuário
+                                    </label>
+                                    <div className="relative">
+                                        <AtSign className="absolute left-3 top-3 text-slate-400" size={18} />
+                                        <input
+                                            type="text"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                                            placeholder="seu_username"
+                                            maxLength={20}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all placeholder-slate-400"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-500">Apenas letras minúsculas, números e underline.</p>
                                 </div>
-                                <p className="text-[10px] text-slate-500">Usado para menções (@). Apenas letras minúsculas, números e underline.</p>
-                            </div>
                             </>
                         )}
 
@@ -332,9 +332,9 @@ export default function LoginScreen({ onLoginSuccess }) {
                                         Senha
                                     </label>
                                     {viewMode === 'login' && (
-                                        <button 
-                                            type="button" 
-                                            onClick={() => switchMode('forgot_password')} 
+                                        <button
+                                            type="button"
+                                            onClick={() => switchMode('forgot_password')}
                                             aria-label="Ir para a tela de recuperação de senha"
                                             className="text-xs font-bold text-brand-600 hover:text-brand-500 transition-colors"
                                         >
@@ -365,10 +365,10 @@ export default function LoginScreen({ onLoginSuccess }) {
                             disabled={loading}
                             className="w-full py-3.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-bold text-sm transition-all shadow-md shadow-brand-500/10 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none mt-2"
                         >
-                            {loading ? 'Processando...' : 
-                                viewMode === 'login' ? 'Entrar na Plataforma' : 
-                                viewMode === 'register' ? 'Criar Conta' : 
-                                'Enviar Link de Recuperação'}
+                            {loading ? 'Processando...' :
+                                viewMode === 'login' ? 'Entrar na Plataforma' :
+                                    viewMode === 'register' ? 'Criar Conta' :
+                                        'Enviar Link de Recuperação'}
                         </button>
                     </form>
 
@@ -376,8 +376,8 @@ export default function LoginScreen({ onLoginSuccess }) {
                     {viewMode === 'login' && (
                         <div className="text-center text-sm text-slate-500 mt-6">
                             Não possui uma conta?{' '}
-                            <button 
-                                onClick={() => switchMode('register')} 
+                            <button
+                                onClick={() => switchMode('register')}
                                 aria-label="Ir para a tela de criação de conta"
                                 className="font-bold text-brand-600 hover:text-brand-500 transition-colors"
                             >
@@ -388,8 +388,8 @@ export default function LoginScreen({ onLoginSuccess }) {
                     {viewMode === 'register' && (
                         <div className="text-center text-sm text-slate-500 mt-6">
                             Já possui uma conta?{' '}
-                            <button 
-                                onClick={() => switchMode('login')} 
+                            <button
+                                onClick={() => switchMode('login')}
                                 aria-label="Ir para a tela de login"
                                 className="font-bold text-brand-600 hover:text-brand-500 transition-colors"
                             >

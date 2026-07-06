@@ -27,6 +27,7 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [initialOpenCardId, setInitialOpenCardId] = useState(null);
+  const [isBlockingExit, setIsBlockingExit] = useState(false);
 
   // Estado do usuário no banco de dados (para ID de notificações)
   const [dbUser, setDbUser] = useState(null);
@@ -73,6 +74,10 @@ export default function App() {
 
   // Função para buscar os detalhes completos do projeto (incluindo colunas e etiquetas) ao selecioná-lo
   const handleSelectProject = async (proj) => {
+    if (isBlockingExit) {
+      alert("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição antes de sair.");
+      return;
+    }
     if (!proj) {
       setSelectedProject(null);
       return;
@@ -324,6 +329,10 @@ export default function App() {
   }, [dbUser, socketStatus]);
 
   const handleLogout = async () => {
+    if (isBlockingExit) {
+      alert("Você possui cards pendentes a serem migrados. Crie a próxima sprint para concluir a transição antes de sair.");
+      return;
+    }
     try {
       await signOut(auth);
     } catch (err) {
@@ -587,6 +596,7 @@ export default function App() {
             onLogout={handleLogout}
             initialOpenCardId={initialOpenCardId}
             onClearInitialOpenCardId={() => setInitialOpenCardId(null)}
+            setIsBlockingExit={setIsBlockingExit}
           />
         )}
       </main>
