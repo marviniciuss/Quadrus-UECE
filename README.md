@@ -18,7 +18,7 @@ O **Quadrus** é uma plataforma moderna e intuitiva de gestão ágil (Kanban) pr
 ## 🛠️ Stack Tecnológica (PERN Stack)
 
 * **Frontend:** React.js, Vite, Tailwind CSS, dnd-kit (drag-and-drop), Axios, Socket.io-client.
-* **Backend:** Node.js, Express.js, Socket.io, Zod (validação de schemas), JWT & Bcrypt (segurança/cookies HttpOnly).
+* **Backend:** Node.js, Express.js, Socket.io, Zod (validação de schemas), Firebase Admin SDK (autenticação segura e gerenciamento de sessões).
 * **Banco de Dados & ORM:** PostgreSQL, Prisma ORM.
 
 ---
@@ -62,11 +62,16 @@ cd backend
 npm install
 ```
 
-#### Variáveis de Ambiente (.env)
-O arquivo `.env` na raiz do backend vem pré-configurado de fábrica para desenvolvimento. Caso queira customizar a conexão com o banco ou a chave secreta do JWT, edite as variáveis contidas nele:
+#### Variáveis de Ambiente do Backend (.env)
+Como os arquivos `.env` são mantidos privados e não são commitados, crie o arquivo `.env` na raiz do diretório `backend` usando o arquivo `.env.example` como modelo:
+```bash
+# Crie o arquivo .env
+cp .env.example .env
+```
+
+Abra o arquivo `.env` criado e preencha ou ajuste as variáveis necessárias:
 * `PORT`: Porta padrão do servidor backend (`5001`)
 * `DATABASE_URL`: String de conexão com o banco Postgres (`postgresql://postgres:postgres@localhost:5432/quadrus?schema=public`)
-* `JWT_SECRET`: Chave secreta de geração de tokens de sessão
 * `CLIENT_URL`: URL de origem do frontend para liberação de CORS (`http://localhost:5173`)
 
 #### Credenciais Firebase Admin SDK (Privado)
@@ -146,3 +151,27 @@ npm run dev
 * `/backend`: Lógica de negócios, conexões de socket, regras da API Express e schemas do banco no Prisma.
 * `/frontend`: Interface do usuário de SPA, integração com socket de eventos e consumo da REST API via Axios.
 * `docker-compose.yml`: Definição de containers de desenvolvimento local.
+
+---
+
+## 🃏 Regras de Negócio do Planning Poker
+
+A funcionalidade de **Planning Poker** integrada ao Quadrus segue regras específicas para garantir a imparcialidade e a conformidade do processo de estimativa:
+
+1. **Início da Votação:**
+   * Apenas o **PO (Product Owner)** ou o **Gerente** do projeto podem iniciar a votação para a pontuação de um card.
+   * Todos os desenvolvedores (`DEV`) vinculados ao projeto são notificados imediatamente sobre o início.
+   * O PO/Gerente define o prazo de encerramento da votação (com limite máximo de **até 24 horas**).
+
+2. **Fluxo de Votação (Desenvolvedores):**
+   * Os votos dos desenvolvedores (`DEV`) são mantidos sob total **anonimato**.
+   * As opções de voto disponíveis seguem a escala Fibonacci adaptada: `[1, 2, 3, 5, 8, 13, 21, ?]`.
+   * Um desenvolvedor pode **cancelar ou alterar** o seu voto livremente a qualquer momento antes do término do prazo.
+
+3. **Visualização Parcial (Durante a Votação):**
+   * Enquanto o período de votação estiver ativo, todos os membros do projeto veem **apenas a quantidade de votos** acumulada em cada opção (ex: "3 votos no número 8", "1 voto no número 3"), sem revelar a autoria de cada voto.
+
+4. **Encerramento da Votação e Decisão:**
+   * Uma vez expirada a votação, o **PO** e o **Gerente** recebem uma notificação de conclusão.
+   * A partir desse momento, os votos detalhados se tornam visíveis para o PO/Gerente.
+   * O PO/Gerente define a pontuação final selecionando a estimativa desejada e clicando em **"Decidir Pontuação"**.
