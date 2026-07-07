@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Bell,
-  HelpCircle,
+  Info,
   ChevronDown,
   CheckCheck
 } from 'lucide-react';
@@ -446,23 +446,36 @@ export default function App() {
           <div className="relative hidden sm:block" ref={helpRef}>
             <button
               className={`p-2 rounded-lg transition-colors ${helpOpen ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
-              title="Dúvidas / Ajuda"
+              title="Sobre o software"
               onClick={() => setHelpOpen(!helpOpen)}
             >
-              <HelpCircle size={20} />
+              <Info size={20} />
             </button>
             {helpOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg py-2.5 z-50 animate-fade-in text-left">
-                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-2">
-                  Central de Ajuda
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg py-3 z-50 animate-fade-in text-left">
+                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-2 flex items-center gap-1.5">
+                  <Info size={12} className="text-slate-400" />
+                  Sobre o Software
                 </div>
-                <div className="px-4 py-2 space-y-2 text-xs text-slate-600">
-                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Como planejar sprints?</div>
-                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Atribuir atividades a membros</div>
-                  <div className="hover:text-brand-600 cursor-pointer font-semibold transition-colors">✦ Mudar status de cards no Kanban</div>
-                  <div className="pt-2 border-t border-slate-100 text-center font-bold text-brand-600 hover:text-brand-700 cursor-pointer">
-                    Ver documentação completa
-                  </div>
+                <div className="px-4 py-2 space-y-3 text-xs">
+                  <p className="text-slate-500 font-medium leading-relaxed">
+                    Este software foi desenvolvido pela equipe:
+                  </p>
+                  <ul className="space-y-1 border-t border-slate-100 pt-2.5">
+                    {[
+                      "Francisca Vitoria Moreira Pinheiro Rodrigues",
+                      "Joao Felipe Marques Sena",
+                      "Joel Lacerda Oliveira",
+                      "Juan Caio Lima Macedo",
+                      "Marcus Vinicius Nunes Guimarães",
+                      "Matheus Coelho Batista"
+                    ].map((name, idx) => (
+                      <li key={idx} className="flex items-center gap-2 py-1 px-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />
+                        <span className="font-semibold text-slate-700 leading-tight">{name}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             )}
