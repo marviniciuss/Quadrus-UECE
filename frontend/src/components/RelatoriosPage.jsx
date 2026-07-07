@@ -16,7 +16,7 @@ export default function RelatoriosPage({ projectId, sprints = [], project = {} }
   const riskyActiveCards = activeCards.filter(c => c.em_risco).length;
   const saudeSprint = totalActiveCards > 0 
     ? Math.round(((totalActiveCards - riskyActiveCards) / totalActiveCards) * 100)
-    : 92; // default 92% fallback
+    : 100; // default 100% when no active cards
 
   // 3. Progresso da Sprint (story points concluídos vs planejados na sprint ativa)
   const totalActivePoints = activeCards.reduce((acc, c) => acc + (c.story_points || 0), 0);

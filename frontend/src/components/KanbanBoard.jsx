@@ -1990,7 +1990,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                 }
                                 setSelectedCardId(card.id_card);
                               }}
-                              className={`group bg-white border border-slate-200 rounded-xl p-4.5 p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4 ${
+                              className={`group bg-white border border-slate-200 rounded-xl p-4 text-left shadow-sm hover:shadow-md hover:border-brand-300 cursor-pointer active:cursor-grabbing transition-all duration-200 relative border-l-4 ${
                                 dragOverCardId === card.id_card ? 'border-t-4 border-t-[#320066]' : ''
                               }`}
                               style={{ borderLeftColor: col.colorHex || '#64748b' }}
@@ -2033,16 +2033,16 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   {/* Avatar do responsável */}
-                                  <div className="flex -space-x-1.5">
-                                    {card.responsavel && (
+                                  {card.responsavel && (
+                                    <div className="flex -space-x-1.5">
                                       <AvatarWithFallback
                                         nome={card.responsavel.nome}
                                         foto={card.responsavel.foto}
                                         title={card.responsavel.nome}
                                         className="w-6 h-6 rounded-full border border-white bg-slate-50"
                                       />
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
 
                                   {/* Etiquetas do Card (limite a 1) */}
                                   {((card.etiquetas && card.etiquetas.length > 0) || (card.tags && card.tags.length > 0)) && (
@@ -2138,8 +2138,11 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
               <div className="flex flex-col w-full text-left">
                 {/* Header da Tela */}
                 <div className="text-left mb-6 md:mb-8">
-                  <h1 className="text-2xl font-extrabold text-slate-800">Planejamento de Sprint e Ciclos</h1>
-                  <p className="text-slate-500 text-sm mt-1">Gerencie a velocidade da sua engenharia. Inicialize novos ciclos e realize transições limpas entre sprints com a transferência automática de trabalhos incompletos.</p>
+                  <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                    <FolderKanban className="text-[#320066]" size={24} />
+                    Planejamento de Sprint e Ciclos
+                  </h1>
+                  <p className="text-slate-400 text-xs mt-1">Gerencie a velocidade da sua engenharia. Inicialize novos ciclos e realize transições limpas entre sprints com a transferência automática de trabalhos incompletos.</p>
                 </div>
 
                 {/* Grid Principal */}
@@ -2151,7 +2154,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                     // Coluna da Direita (lg:col-span-1): Criar Sprint
                     <>
                       {/* Esquerda: Encerrar Sprint */}
-                      <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[400px] flex flex-col justify-between h-full">
+                      <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[520px] flex flex-col justify-between h-full">
                         {activeSprint ? (() => {
                           const unfinishedCards = (activeSprint.cards || []).filter(c => c.status !== 'CONCLUIDO' && c.id_coluna !== 'CONCLUIDO');
                           const finishedCards = (activeSprint.cards || []).filter(c => c.status === 'CONCLUIDO' || c.id_coluna === 'CONCLUIDO');
@@ -2159,21 +2162,20 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                           return (
                             <div className="flex flex-col h-full justify-between gap-6">
                               <div>
-                                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                                  <div>
-                                    <h2 className="text-md font-extrabold text-slate-800">Encerrar Sprint</h2>
-                                    <p className="text-slate-500 text-xs mt-0.5">A {activeSprint.nome} {formatTerminationText(activeSprint.data_fim)}. Escolha quais tarefas pendentes serão migradas para a próxima sprint.</p>
-                                  </div>
+                                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                                  <Archive className="text-[#320066]" size={20} />
+                                  <h2 className="text-md font-extrabold text-slate-800 uppercase tracking-wider">Encerrar Sprint</h2>
                                 </div>
+                                <p className="text-slate-500 text-xs mt-0.5 mb-2">A {activeSprint.nome} {formatTerminationText(activeSprint.data_fim)}. Escolha quais tarefas pendentes serão migradas para a próxima sprint.</p>
 
                                 <div className="flex flex-col md:flex-row items-stretch gap-4 mt-4">
                                   {/* Coluna Sprint Atual */}
-                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4">
+                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col min-h-[380px]">
                                     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wide mb-3">
                                       <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-pulse" />
                                       {activeSprint.nome} (Atual) - Pendentes
                                     </span>
-                                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                    <div className="space-y-2 overflow-y-auto pr-1 flex-1 max-h-[340px] flex flex-col">
                                       {unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).map(card => (
                                         <div key={card.id_card} onClick={() => setMigratedCardIds(prev => [...prev, card.id_card])} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
                                           <div className="flex justify-between items-center gap-2 mb-1">
@@ -2188,7 +2190,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                         </div>
                                       ))}
                                       {unfinishedCards.filter(c => !migratedCardIds.includes(c.id_card)).length === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
+                                        <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 py-8">
                                           <Calendar size={20} className="mb-1" />
                                           <p className="text-[10px] font-semibold">Nenhum card pendente nesta sprint</p>
                                         </div>
@@ -2214,42 +2216,32 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
                                   </div>
 
                                   {/* Coluna Sprint Próxima */}
-                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between">
-                                    <div>
-                                      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                                        Tarefas a Migrar (Próxima Sprint)
-                                      </span>
-                                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                                        {migratedCardIds.length > 0 ? (
-                                          unfinishedCards.filter(c => migratedCardIds.includes(c.id_card)).map(card => (
-                                            <div key={card.id_card} onClick={() => setMigratedCardIds(prev => prev.filter(id => id !== card.id_card))} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
-                                              <div className="flex justify-between items-center gap-2 mb-1">
-                                                <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                                  card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                                                    'bg-slate-50 text-slate-600 border border-slate-100'
-                                                  }`}>
-                                                  {card.prioridade}
-                                                </span>
-                                              </div>
-                                              <p className="font-bold text-slate-700">{card.titulo}</p>
+                                  <div className="flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-4 flex flex-col min-h-[380px]">
+                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-blue-600 uppercase tracking-wide mb-3">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                                      Próxima Sprint - A Migrar
+                                    </span>
+                                    <div className="space-y-2 overflow-y-auto pr-1 flex-1 max-h-[340px] flex flex-col">
+                                      {migratedCardIds.length > 0 ? (
+                                        unfinishedCards.filter(c => migratedCardIds.includes(c.id_card)).map(card => (
+                                          <div key={card.id_card} onClick={() => setMigratedCardIds(prev => prev.filter(id => id !== card.id_card))} className="bg-white border border-slate-200/80 rounded-lg p-2.5 shadow-sm text-xs text-left cursor-pointer hover:border-blue-300 transition-colors">
+                                            <div className="flex justify-between items-center gap-2 mb-1">
+                                              <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded ${card.prioridade === 'ALTA' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                                card.prioridade === 'MEDIA' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                                  'bg-slate-50 text-slate-600 border border-slate-100'
+                                                }`}>
+                                                {card.prioridade}
+                                              </span>
                                             </div>
-                                          ))
-                                        ) : (
-                                          <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
-                                            <Calendar size={20} className="mb-1" />
-                                            <p className="text-[10px] font-semibold">Nenhuma tarefa marcada para migrar</p>
+                                            <p className="font-bold text-slate-700">{card.titulo}</p>
                                           </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div
-                                      onClick={() => {
-                                        setIsBacklogModalOpen(true);
-                                      }}
-                                      className="border border-dashed border-slate-300 rounded-lg p-3 text-center text-[10px] font-bold text-slate-400 mt-4 bg-white/50 cursor-pointer hover:border-brand-500 hover:text-brand-600 transition-all select-none"
-                                    >
-                                      Adicionar mais itens do backlog...
+                                        ))
+                                      ) : (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 py-8">
+                                          <Calendar size={20} className="mb-1" />
+                                          <p className="text-[10px] font-semibold">Nenhum card marcado para migrar</p>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -2604,7 +2596,7 @@ export default function KanbanBoard({ project, onUpdateProject, userDisplayName,
           })()
         ) : activeTab === 'metrics' ? (
           /* ================= TELA MÉTRICAS ================= */
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-10 mt-6">
+          <div className="w-full text-left">
              <RelatoriosPage projectId={project.id_projeto} sprints={sprints} project={project} />
           </div>
         ) : (

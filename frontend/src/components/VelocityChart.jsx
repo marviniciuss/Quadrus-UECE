@@ -51,7 +51,7 @@ export default function VelocityChart({ projectId, sprints = [], project = {} })
   const activeCards = activeSprint && project.cards 
     ? (project.cards || []).filter(c => c.id_sprint === activeSprint.id_sprint && !c.deletado_em)
     : [];
-  const previsto = activeCards.reduce((acc, c) => acc + (c.story_points || 0), 0) || Math.round(velocidadeMedia * 1.15) || 48;
+  const previsto = activeCards.reduce((acc, c) => acc + (c.story_points || 0), 0);
 
   // 3. Comprometimento (taxa de entrega da última sprint concluída, ou fallback)
   const completedSprints = (sprints || []).filter(s => s.status === 'CONCLUIDA');
@@ -63,10 +63,10 @@ export default function VelocityChart({ projectId, sprints = [], project = {} })
   const lastSprintPlannedPoints = lastSprintCards.reduce((acc, c) => acc + (c.story_points || 0), 0);
   const comprometimento = lastSprintPlannedPoints > 0 
     ? Math.round((lastSprintCompletedPoints / lastSprintPlannedPoints) * 100)
-    : 92; // default 92%
+    : 0; // default 0% when no completed sprints
 
   // 4. Cálculo de tendência
-  let trendPercent = 12;
+  let trendPercent = 0;
   let isTrendUp = true;
   if (data.length >= 2) {
     const lastVal = data[data.length - 1].pontos;
@@ -109,14 +109,16 @@ export default function VelocityChart({ projectId, sprints = [], project = {} })
         
         <div className="flex items-center gap-3">
           {/* Tag de Tendência */}
-          <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
-            isTrendUp 
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-              : 'bg-rose-50 text-rose-700 border-rose-100'
-          }`}>
-            {isTrendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            <span>TENDÊNCIA DE {isTrendUp ? 'ALTA' : 'BAIXA'} {isTrendUp ? '+' : ''}{trendPercent}%</span>
-          </div>
+          {data.length >= 2 && (
+            <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+              isTrendUp 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                : 'bg-rose-50 text-rose-700 border-rose-100'
+            }`}>
+              {isTrendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+              <span>TENDÊNCIA DE {isTrendUp ? 'ALTA' : 'BAIXA'} {isTrendUp ? '+' : ''}{trendPercent}%</span>
+            </div>
+          )}
 
           <select 
             value={agrupamento} 
