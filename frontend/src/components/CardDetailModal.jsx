@@ -972,7 +972,7 @@ export default function CardDetailModal({ cardId, project, currentUserEmail, onC
               <div className="space-y-4 pr-1">
                 {allComments.map((comment) => {
                   const isAuthor = comment.email_autor === currentUserEmail;
-                  const canModifyComment = !comment.isDbComment && (isAuthor || isPO || isGerente);
+                  const canModifyComment = !comment.isDbComment && isAuthor;
                   return (
                     <div key={comment.id_comentario} className="flex gap-3 text-left">
                       <AvatarWithFallback

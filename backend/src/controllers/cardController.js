@@ -343,6 +343,61 @@ export const atualizarCard = async (req, res) => {
       });
     }
 
+    // Validar se o usuário está tentando editar/excluir comentários de terceiros
+    if (descricao !== undefined) {
+      const parseComments = (descText) => {
+        let rawText = descText || '';
+        const commentsRegex = /<!-- DISCUSSION:\s*(\[.*?\])\s*-->/;
+        const commentsMatch = rawText.match(commentsRegex);
+        if (commentsMatch) {
+          try {
+            return JSON.parse(commentsMatch[1]);
+          } catch (e) {}
+        }
+        return [];
+      };
+
+      const oldComments = parseComments(card.descricao);
+      const newComments = parseComments(descricao);
+
+      const oldCommentsMap = new Map(oldComments.map(c => [c.id_comentario, c]));
+      const newCommentsMap = new Map(newComments.map(c => [c.id_comentario, c]));
+
+      // 1. Exclusão de comentário
+      for (const oldComment of oldComments) {
+        if (!newCommentsMap.has(oldComment.id_comentario)) {
+          const autorEmail = oldComment.email_autor;
+          if (autorEmail && autorEmail !== req.user.email) {
+            return res.status(403).json({
+              error: "Acesso negado: você só pode excluir seus próprios comentários"
+            });
+          }
+        }
+      }
+
+      // 2. Edição de comentário
+      for (const newComment of newComments) {
+        const oldComment = oldCommentsMap.get(newComment.id_comentario);
+        if (oldComment) {
+          if (oldComment.texto !== newComment.texto) {
+            const autorEmail = oldComment.email_autor;
+            if (autorEmail && autorEmail !== req.user.email) {
+              return res.status(403).json({
+                error: "Acesso negado: você só pode editar seus próprios comentários"
+              });
+            }
+          }
+        } else {
+          // 3. Criação de comentário (garantir que não forje o autor)
+          if (newComment.email_autor && newComment.email_autor !== req.user.email) {
+            return res.status(403).json({
+              error: "Acesso negado: email do autor inválido"
+            });
+          }
+        }
+      }
+    }
+
     const isGerente = membro.perfil === "GERENTE";
     const isPO = membro.perfil === "PO";
     const isCriador = !card.id_criador || card.id_criador === membro.id_usuario;
